@@ -4,6 +4,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import AdminHeader from '../../../components/AdminHeader.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
 import { getContestBySlug, getSubmission, updateSubmissionStatus } from '../../../lib/db';
+import { formatFileSize } from '../../../lib/storage';
 
 const { slug, id } = Astro.params;
 const db = env.DB;
@@ -60,15 +61,35 @@ const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
           <dd class="whitespace-pre-line font-medium text-gray-800">{submission.description || '-'}</dd>
         </div>
         <div>
-          <dt class="text-xs text-gray-400">작품 링크</dt>
+          <dt class="text-xs text-gray-400">작품</dt>
           <dd class="font-medium text-gray-800">
-            {submission.work_link ? <a href={submission.work_link} target="_blank" class="text-brand-600 underline" style="color:#4f46e5">{submission.work_link}</a> : '-'}
+            {
+              submission.work_file_key ? (
+                <a href={`/admin/files/${submission.work_file_key}`} class="text-brand-600 underline" style="color:#4f46e5">
+                  ⬇ {submission.work_file_name || '파일 다운로드'} ({formatFileSize(submission.work_file_size)})
+                </a>
+              ) : submission.work_link ? (
+                <a href={submission.work_link} target="_blank" class="text-brand-600 underline" style="color:#4f46e5">{submission.work_link}</a>
+              ) : (
+                '-'
+              )
+            }
           </dd>
         </div>
         <div>
-          <dt class="text-xs text-gray-400">발표 자료 링크</dt>
+          <dt class="text-xs text-gray-400">발표 자료</dt>
           <dd class="font-medium text-gray-800">
-            {submission.slide_link ? <a href={submission.slide_link} target="_blank" class="text-brand-600 underline" style="color:#4f46e5">{submission.slide_link}</a> : '-'}
+            {
+              submission.slide_file_key ? (
+                <a href={`/admin/files/${submission.slide_file_key}`} class="text-brand-600 underline" style="color:#4f46e5">
+                  ⬇ {submission.slide_file_name || '파일 다운로드'} ({formatFileSize(submission.slide_file_size)})
+                </a>
+              ) : submission.slide_link ? (
+                <a href={submission.slide_link} target="_blank" class="text-brand-600 underline" style="color:#4f46e5">{submission.slide_link}</a>
+              ) : (
+                '-'
+              )
+            }
           </dd>
         </div>
         <div>

@@ -10,3 +10,8 @@ database_name = "contest-platform-db"
 # wrangler d1 create contest-platform-db 실행 후 나오는 database_id로 교체하세요.
 database_id = "aa496dc1-48f4-4eb3-aa82-0b0551e26d14"
 migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "moeumteo-files"
+# Cloudflare 대시보드 → R2 → Create bucket 에서 정확히 이 이름(moeumteo-files)으로 버킷을 만들어야 합니다.
