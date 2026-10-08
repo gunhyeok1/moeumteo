@@ -1,0 +1,28 @@
+---
+interface Props {
+  contestName?: string;
+}
+const { contestName } = Astro.props;
+---
+
+<header class="sticky top-0 z-30 border-b border-black/5 bg-white/80 backdrop-blur-md">
+  <div class="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
+    <a href="/" class="flex items-center gap-2 font-bold text-lg tracking-tight text-brand-700" style="color:#4338ca">
+      <span
+        class="flex h-8 w-8 items-center justify-center rounded-lg text-white text-sm font-extrabold"
+        style="background: linear-gradient(135deg,#6366f1,#14b8a6)"
+      >
+        모
+      </span>
+      모음터
+    </a>
+    {
+      contestName && (
+        <span class="hidden truncate text-sm text-gray-400 sm:block">
+          {contestName}
+        </span>
+      )
+    }
+    <a href="/admin/login" class="text-sm font-medium text-gray-400 hover:text-gray-600">관리자</a>
+  </div>
+</header>

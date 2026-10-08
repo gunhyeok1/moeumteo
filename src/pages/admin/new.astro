@@ -1,0 +1,153 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminHeader from '../../components/AdminHeader.astro';
+import { createContest, getContestBySlug } from '../../lib/db';
+import { slugify } from '../../lib/validation';
+
+const db = env.DB;
+
+let errors: Record<string, string> = {};
+let values = {
+  name: '',
+  slug: '',
+  description: '',
+  categories: '',
+  topics: '',
+  allowFreeTopic: true,
+  allowTeam: true,
+  maxParticipants: 4,
+  startAt: '',
+  endAt: '',
+  isActive: true,
+};
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const get = (k: string) => String(form.get(k) ?? '').trim();
+
+  values = {
+    name: get('name'),
+    slug: get('slug') || slugify(get('name')),
+    description: get('description'),
+    categories: get('categories'),
+    topics: get('topics'),
+    allowFreeTopic: form.get('allow_free_topic') === 'on',
+    allowTeam: form.get('allow_team') === 'on',
+    maxParticipants: Number(get('max_participants')) || 4,
+    startAt: get('start_at'),
+    endAt: get('end_at'),
+    isActive: form.get('is_active') === 'on',
+  };
+
+  if (!values.name) errors.name = '공모전 이름을 입력해주세요.';
+  if (!values.slug) errors.slug = '주소(slug)를 입력해주세요.';
+  if (values.slug && !/^[a-z0-9가-힣-]+$/.test(values.slug)) {
+    errors.slug = '영문 소문자, 숫자, 하이픈(-)만 사용할 수 있어요.';
+  }
+  if (!errors.slug) {
+    const existing = await getContestBySlug(db, values.slug);
+    if (existing) errors.slug = '이미 사용 중인 주소예요. 다른 주소를 입력해주세요.';
+  }
+  if (values.maxParticipants < 1 || values.maxParticipants > 10) {
+    errors.maxParticipants = '참가 인원은 1~10명 사이로 설정해주세요.';
+  }
+
+  if (Object.keys(errors).length === 0) {
+    const parseList = (s: string) =>
+      s
+        .split('\n')
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+    await createContest(db, {
+      slug: values.slug,
+      name: values.name,
+      description: values.description,
+      categories: parseList(values.categories),
+      topics: parseList(values.topics),
+      allowFreeTopic: values.allowFreeTopic,
+      allowTeam: values.allowTeam,
+      maxParticipants: values.maxParticipants,
+      startAt: values.startAt || null,
+      endAt: values.endAt || null,
+      isActive: values.isActive,
+    });
+    return Astro.redirect(`/admin/${values.slug}`, 303);
+  }
+}
+---
+
+<BaseLayout title="새 공모전 만들기 · 모음터">
+  <AdminHeader title="새 공모전 만들기" />
+
+  <main class="mx-auto max-w-2xl px-5 py-10">
+    <a href="/admin" class="text-sm font-medium text-gray-400 hover:text-gray-600">← 목록으로</a>
+    <h1 class="mt-2 mb-6 text-xl font-extrabold text-gray-900">새 공모전 만들기</h1>
+
+    <form method="POST" class="card space-y-5 p-6">
+      <div>
+        <label class="field-label" for="name">공모전 이름 *</label>
+        <input id="name" name="name" class="input-field" data-invalid={!!errors.name} value={values.name} placeholder="예: 2026학년도 교내 정보통신윤리교육 경진대회" />
+        {errors.name && <p class="field-error">{errors.name}</p>}
+      </div>
+
+      <div>
+        <label class="field-label" for="slug">주소 (slug) *</label>
+        <input id="slug" name="slug" class="input-field" data-invalid={!!errors.slug} value={values.slug} placeholder="예: safe-digital-2026" />
+        <p class="field-hint">학생들이 접속할 주소에 사용돼요. 예: your-site.pages.dev/c/<b>safe-digital-2026</b></p>
+        {errors.slug && <p class="field-error">{errors.slug}</p>}
+      </div>
+
+      <div>
+        <label class="field-label" for="description">소개 / 안내 문구</label>
+        <textarea id="description" name="description" rows="4" class="input-field">{values.description}</textarea>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="field-label" for="categories">공모 분야 목록 (한 줄에 하나씩, 비우면 자유 입력)</label>
+          <textarea id="categories" name="categories" rows="4" class="input-field" placeholder={'포스터\nUCC(영상)\n글쓰기'}>{values.categories}</textarea>
+        </div>
+        <div>
+          <label class="field-label" for="topics">공모 주제 목록 (한 줄에 하나씩, 비우면 자유 입력)</label>
+          <textarea id="topics" name="topics" rows="4" class="input-field" placeholder={'딥페이크 예방\n사이버 폭력 예방'}>{values.topics}</textarea>
+        </div>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="allow_free_topic" checked={values.allowFreeTopic} />
+        주제 목록에 "자유 주제 (직접 입력)" 옵션 추가
+      </label>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="allow_team" checked={values.allowTeam} />
+        모둠(단체) 참가 허용
+      </label>
+
+      <div>
+        <label class="field-label" for="max_participants">참가 학생 최대 인원</label>
+        <input id="max_participants" name="max_participants" type="number" min="1" max="10" class="input-field" data-invalid={!!errors.maxParticipants} value={values.maxParticipants} />
+        {errors.maxParticipants && <p class="field-error">{errors.maxParticipants}</p>}
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="field-label" for="start_at">접수 시작일 (선택)</label>
+          <input id="start_at" name="start_at" type="date" class="input-field" value={values.startAt} />
+        </div>
+        <div>
+          <label class="field-label" for="end_at">접수 마감일 (선택)</label>
+          <input id="end_at" name="end_at" type="date" class="input-field" value={values.endAt} />
+        </div>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="is_active" checked={values.isActive} />
+        지금 바로 접수 시작 (공개 페이지에 노출)
+      </label>
+
+      <button type="submit" class="btn-primary w-full">공모전 만들기</button>
+    </form>
+  </main>
+</BaseLayout>

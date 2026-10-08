@@ -1,0 +1,24 @@
+{
+  "name": "contest-platform",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler pages dev ./dist",
+    "deploy": "npm run build && wrangler pages deploy ./dist",
+    "cf-typegen": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply contest-platform-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply contest-platform-db --remote",
+    "db:create": "wrangler d1 create contest-platform-db"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.3.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.7",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "wrangler": "^4.148.0"
+  }
+}

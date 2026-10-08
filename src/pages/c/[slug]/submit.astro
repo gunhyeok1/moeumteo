@@ -1,0 +1,304 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { getContestBySlug, createSubmission } from '../../../lib/db';
+import { isValidParticipant, parseParticipant, isValidUrl } from '../../../lib/validation';
+
+const { slug } = Astro.params;
+const db = env.DB;
+const contest = slug ? await getContestBySlug(db, slug) : null;
+
+if (!contest || !contest.is_active) {
+  return new Response(null, { status: 404 });
+}
+
+const FREE_TOPIC_VALUE = '__FREE__';
+const maxParticipants = contest.max_participants || 4;
+
+let errors: Record<string, string> = {};
+let values = {
+  category: '',
+  topicSelect: '',
+  freeTopicText: '',
+  title: '',
+  description: '',
+  workLink: '',
+  slideLink: '',
+  aiTools: '',
+  participationType: 'individual',
+  teamName: '',
+  participants: Array.from({ length: maxParticipants }, () => ''),
+  privacyConsent: false,
+  exhibitConsent: false,
+  pledgeConsent: false,
+};
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const get = (k: string) => String(form.get(k) ?? '').trim();
+
+  const participantsRaw = Array.from({ length: maxParticipants }, (_, i) => get(`participant_${i + 1}`));
+
+  values = {
+    category: get('category'),
+    topicSelect: get('topic'),
+    freeTopicText: get('free_topic_text'),
+    title: get('title'),
+    description: get('description'),
+    workLink: get('work_link'),
+    slideLink: get('slide_link'),
+    aiTools: get('ai_tools'),
+    participationType: contest.allow_team ? get('participation_type') || 'individual' : 'individual',
+    teamName: get('team_name'),
+    participants: participantsRaw,
+    privacyConsent: form.get('privacy_consent') === 'on',
+    exhibitConsent: form.get('exhibit_consent') === 'on',
+    pledgeConsent: form.get('pledge_consent') === 'on',
+  };
+
+  const { privacyConsent, exhibitConsent, pledgeConsent } = values;
+
+  if (!values.title) errors.title = '작품 제목을 입력해주세요.';
+
+  if (contest.categories.length > 0) {
+    if (!values.category) errors.category = '공모 분야를 선택해주세요.';
+  } else if (!values.category) {
+    errors.category = '공모 분야를 입력해주세요.';
+  }
+
+  if (contest.topics.length > 0) {
+    if (!values.topicSelect) errors.topic = '공모 주제를 선택해주세요.';
+    if (values.topicSelect === FREE_TOPIC_VALUE && !values.freeTopicText) {
+      errors.freeTopicText = '자유 주제 내용을 입력해주세요.';
+    }
+  } else if (!values.topicSelect) {
+    errors.topic = '공모 주제를 입력해주세요.';
+  }
+
+  if (values.workLink && !isValidUrl(values.workLink)) {
+    errors.workLink = 'https:// 로 시작하는 올바른 링크를 입력해주세요.';
+  }
+  if (values.slideLink && !isValidUrl(values.slideLink)) {
+    errors.slideLink = 'https:// 로 시작하는 올바른 링크를 입력해주세요.';
+  }
+
+  if (values.participationType === 'team' && !values.teamName) {
+    errors.teamName = '모둠명을 입력해주세요.';
+  }
+
+  const parsedParticipants: ReturnType<typeof parseParticipant>[] = [];
+  participantsRaw.forEach((raw, i) => {
+    if (!raw) {
+      if (i === 0) errors.participant_1 = '참가 학생1 정보를 입력해주세요.';
+      return;
+    }
+    if (!isValidParticipant(raw)) {
+      errors[`participant_${i + 1}`] = '"학년 반 번호 이름" 형식으로 입력해주세요. 예: 2학년 3반 15번 홍길동';
+      return;
+    }
+    parsedParticipants.push(parseParticipant(raw));
+  });
+
+  if (!privacyConsent) errors.privacyConsent = '개인정보 수집·이용에 동의해야 제출할 수 있어요.';
+  if (!exhibitConsent) errors.exhibitConsent = '작품 전시 동의가 필요해요.';
+  if (!pledgeConsent) errors.pledgeConsent = '참가 서약에 동의해야 제출할 수 있어요.';
+
+  if (Object.keys(errors).length === 0) {
+    const topic = values.topicSelect === FREE_TOPIC_VALUE ? '자유 주제' : values.topicSelect;
+    const id = await createSubmission(db, {
+      contestId: contest.id,
+      category: values.category,
+      topic,
+      freeTopicText: values.topicSelect === FREE_TOPIC_VALUE ? values.freeTopicText : '',
+      title: values.title,
+      description: values.description,
+      workLink: values.workLink,
+      slideLink: values.slideLink,
+      aiTools: values.aiTools,
+      participationType: values.participationType,
+      teamName: values.participationType === 'team' ? values.teamName : '',
+      participants: parsedParticipants.filter(Boolean) as any,
+      privacyConsent,
+      exhibitConsent,
+      pledgeConsent,
+    });
+    return Astro.redirect(`/c/${contest.slug}/complete?id=${id}`, 303);
+  }
+}
+---
+
+<BaseLayout title={`참가 신청서 · ${contest.name}`}>
+  <SiteHeader contestName={contest.name} />
+
+  <main class="mx-auto max-w-2xl px-5 py-12">
+    <div class="mb-8">
+      <a href={`/c/${contest.slug}`} class="text-sm font-medium text-gray-400 hover:text-gray-600">← 대회 소개로 돌아가기</a>
+      <h1 class="mt-2 text-2xl font-extrabold text-gray-900">{contest.name}</h1>
+      <p class="mt-1 text-sm text-gray-500">참가 신청서를 작성해주세요. 제출 후에는 접수번호로 내용을 확인할 수 있어요.</p>
+    </div>
+
+    <form method="POST" class="space-y-6" novalidate>
+      <section class="card space-y-5 p-6">
+        <h2 class="text-base font-bold text-gray-800">작품 정보</h2>
+
+        <div>
+          <label class="field-label" for="category">공모 분야</label>
+          {
+            contest.categories.length > 0 ? (
+              <select id="category" name="category" class="input-field" data-invalid={!!errors.category}>
+                <option value="" disabled selected={!values.category}>선택해주세요</option>
+                {contest.categories.map((c: string) => (
+                  <option value={c} selected={values.category === c}>{c}</option>
+                ))}
+              </select>
+            ) : (
+              <input id="category" name="category" class="input-field" data-invalid={!!errors.category} value={values.category} />
+            )
+          }
+          {errors.category && <p class="field-error">{errors.category}</p>}
+        </div>
+
+        <div>
+          <label class="field-label" for="topic">공모 주제</label>
+          {
+            contest.topics.length > 0 ? (
+              <select id="topic" name="topic" class="input-field" data-invalid={!!errors.topic}>
+                <option value="" disabled selected={!values.topicSelect}>선택해주세요</option>
+                {contest.topics.map((t: string) => (
+                  <option value={t} selected={values.topicSelect === t}>{t}</option>
+                ))}
+                {contest.allow_free_topic === 1 && (
+                  <option value="__FREE__" selected={values.topicSelect === '__FREE__'}>자유 주제 (직접 입력)</option>
+                )}
+              </select>
+            ) : (
+              <input id="topic" name="topic" class="input-field" data-invalid={!!errors.topic} value={values.topicSelect} />
+            )
+          }
+          {errors.topic && <p class="field-error">{errors.topic}</p>}
+        </div>
+
+        {
+          contest.topics.length > 0 && contest.allow_free_topic === 1 && (
+            <div>
+              <label class="field-label" for="free_topic_text">자유 주제 내용 (주제를 "자유 주제"로 선택한 경우 작성)</label>
+              <input id="free_topic_text" name="free_topic_text" class="input-field" data-invalid={!!errors.freeTopicText} value={values.freeTopicText} />
+              {errors.freeTopicText && <p class="field-error">{errors.freeTopicText}</p>}
+            </div>
+          )
+        }
+
+        <div>
+          <label class="field-label" for="title">작품 제목 *</label>
+          <input id="title" name="title" class="input-field" data-invalid={!!errors.title} value={values.title} />
+          {errors.title && <p class="field-error">{errors.title}</p>}
+        </div>
+
+        <div>
+          <label class="field-label" for="description">작품 설명</label>
+          <textarea id="description" name="description" rows="4" class="input-field">{values.description}</textarea>
+        </div>
+
+        <div>
+          <label class="field-label" for="work_link">작품 링크</label>
+          <input id="work_link" name="work_link" class="input-field" placeholder="https://..." data-invalid={!!errors.workLink} value={values.workLink} />
+          {errors.workLink && <p class="field-error">{errors.workLink}</p>}
+        </div>
+
+        <div>
+          <label class="field-label" for="slide_link">발표 자료 링크</label>
+          <input id="slide_link" name="slide_link" class="input-field" placeholder="https://..." data-invalid={!!errors.slideLink} value={values.slideLink} />
+          {errors.slideLink && <p class="field-error">{errors.slideLink}</p>}
+        </div>
+
+        <div>
+          <label class="field-label" for="ai_tools">사용한 AI 도구 (있다면)</label>
+          <input id="ai_tools" name="ai_tools" class="input-field" placeholder="예: Canva, ChatGPT" value={values.aiTools} />
+        </div>
+      </section>
+
+      <section class="card space-y-5 p-6">
+        <h2 class="text-base font-bold text-gray-800">참가 형태</h2>
+
+        {
+          contest.allow_team === 1 ? (
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="participation_type" value="individual" checked={values.participationType !== 'team'} />
+                개인
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="participation_type" value="team" checked={values.participationType === 'team'} />
+                모둠(단체)
+              </label>
+            </div>
+          ) : (
+            <input type="hidden" name="participation_type" value="individual" />
+          )
+        }
+
+        {
+          contest.allow_team === 1 && (
+            <div>
+              <label class="field-label" for="team_name">모둠명 (모둠 참가 시 작성)</label>
+              <input id="team_name" name="team_name" class="input-field" data-invalid={!!errors.teamName} value={values.teamName} />
+              {errors.teamName && <p class="field-error">{errors.teamName}</p>}
+            </div>
+          )
+        }
+
+        <div class="space-y-4">
+          {
+            Array.from({ length: maxParticipants }).map((_, i) => (
+              <div>
+                <label class="field-label" for={`participant_${i + 1}`}>
+                  참가 학생{i + 1} 정보 {i === 0 && '*'}
+                </label>
+                <input
+                  id={`participant_${i + 1}`}
+                  name={`participant_${i + 1}`}
+                  class="input-field"
+                  placeholder="예: 2학년 3반 15번 홍길동"
+                  data-invalid={!!errors[`participant_${i + 1}`]}
+                  value={values.participants[i]}
+                />
+                <p class="field-hint">학년 반 번호 이름 순서로 한 줄로 작성해주세요. (공백 없이도 가능)</p>
+                {errors[`participant_${i + 1}`] && <p class="field-error">{errors[`participant_${i + 1}`]}</p>}
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="card space-y-4 p-6">
+        <h2 class="text-base font-bold text-gray-800">약관 동의</h2>
+
+        <label class="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="privacy_consent" class="mt-1" checked={values.privacyConsent} />
+          <span>
+            개인정보(학년/반/번호/이름) 수집 및 이용에 동의합니다. 수집된 정보는 본 공모전 접수·심사 목적으로만 사용됩니다. *
+          </span>
+        </label>
+        {errors.privacyConsent && <p class="field-error">{errors.privacyConsent}</p>}
+
+        <label class="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="exhibit_consent" class="mt-1" checked={values.exhibitConsent} />
+          <span>제출한 작품이 교내 전시·홍보 목적으로 활용될 수 있음에 동의합니다. *</span>
+        </label>
+        {errors.exhibitConsent && <p class="field-error">{errors.exhibitConsent}</p>}
+
+        <label class="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="pledge_consent" class="mt-1" checked={values.pledgeConsent} />
+          <span>본인(들)은 타인의 저작물을 무단으로 사용하지 않았으며, 제출한 내용이 사실임을 서약합니다. *</span>
+        </label>
+        {errors.pledgeConsent && <p class="field-error">{errors.pledgeConsent}</p>}
+      </section>
+
+      <button type="submit" class="btn-primary w-full">참가 신청 제출하기</button>
+    </form>
+  </main>
+
+  <SiteFooter />
+</BaseLayout>

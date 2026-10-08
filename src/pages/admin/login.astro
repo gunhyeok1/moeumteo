@@ -1,0 +1,63 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { createSessionToken, sessionCookieName, sessionMaxAge, safeEquals } from '../../lib/auth';
+
+const next = Astro.url.searchParams.get('next') || '/admin';
+
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const password = String(form.get('password') ?? '');
+  const nextTarget = String(form.get('next') ?? '/admin');
+
+  if (password && safeEquals(password, env.ADMIN_PASSWORD)) {
+    const token = await createSessionToken(env.SESSION_SECRET);
+    Astro.cookies.set(sessionCookieName(), token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: sessionMaxAge(),
+    });
+    return Astro.redirect(nextTarget.startsWith('/admin') ? nextTarget : '/admin', 303);
+  }
+  error = '비밀번호가 올바르지 않아요.';
+}
+---
+
+<BaseLayout title="관리자 로그인 · 모음터">
+  <main class="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-5">
+    <div class="card w-full p-8">
+      <div class="mb-6 text-center">
+        <span
+          class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg text-white text-sm font-extrabold"
+          style="background: linear-gradient(135deg,#6366f1,#14b8a6)"
+        >
+          모
+        </span>
+        <h1 class="text-xl font-extrabold text-gray-900">관리자 로그인</h1>
+        <p class="mt-1 text-sm text-gray-400">비밀번호를 입력해주세요.</p>
+      </div>
+
+      <form method="POST" class="space-y-4">
+        <input type="hidden" name="next" value={next} />
+        <div>
+          <input
+            type="password"
+            name="password"
+            class="input-field"
+            placeholder="비밀번호"
+            data-invalid={!!error}
+            autofocus
+          />
+          {error && <p class="field-error">{error}</p>}
+        </div>
+        <button type="submit" class="btn-primary w-full">로그인</button>
+      </form>
+    </div>
+
+    <a href="/" class="mt-6 text-sm text-gray-400 hover:text-gray-600">← 홈으로</a>
+  </main>
+</BaseLayout>

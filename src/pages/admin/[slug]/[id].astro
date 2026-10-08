@@ -1,0 +1,124 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdminHeader from '../../../components/AdminHeader.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import { getContestBySlug, getSubmission, updateSubmissionStatus } from '../../../lib/db';
+
+const { slug, id } = Astro.params;
+const db = env.DB;
+const contest = slug ? await getContestBySlug(db, slug) : null;
+const submission = id ? await getSubmission(db, id) : null;
+
+if (!contest || !submission || submission.contest_id !== contest.id) {
+  return new Response(null, { status: 404 });
+}
+
+const STATUS_OPTIONS = ['접수', '검토중', '통과', '보류', '반려'];
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const status = String(form.get('status') ?? submission.status);
+  const adminNote = String(form.get('admin_note') ?? '');
+  await updateSubmissionStatus(db, submission.id, status, adminNote);
+  return Astro.redirect(`/admin/${contest.slug}/${submission.id}?saved=1`, 303);
+}
+
+const saved = Astro.url.searchParams.get('saved') === '1';
+const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
+---
+
+<BaseLayout title={`${submission.title} · ${contest.name}`}>
+  <AdminHeader title={contest.name} />
+
+  <main class="mx-auto max-w-3xl px-5 py-10">
+    <a href={`/admin/${contest.slug}`} class="text-sm font-medium text-gray-400 hover:text-gray-600">← 목록으로</a>
+
+    <div class="mt-3 mb-6 flex items-center justify-between">
+      <div>
+        <p class="font-mono text-xs text-gray-400">{submission.id}</p>
+        <h1 class="mt-1 text-xl font-extrabold text-gray-900">{submission.title}</h1>
+      </div>
+      <StatusBadge status={submission.status} />
+    </div>
+
+    {saved && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">저장되었어요.</div>}
+
+    <div class="card mb-6 space-y-4 p-6">
+      <h2 class="text-sm font-bold text-gray-400">작품 정보</h2>
+      <dl class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <dt class="text-xs text-gray-400">공모 분야</dt>
+          <dd class="font-medium text-gray-800">{submission.category || '-'}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-400">공모 주제</dt>
+          <dd class="font-medium text-gray-800">{submission.topic || '-'}{submission.free_topic_text && ` (${submission.free_topic_text})`}</dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-xs text-gray-400">작품 설명</dt>
+          <dd class="whitespace-pre-line font-medium text-gray-800">{submission.description || '-'}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-400">작품 링크</dt>
+          <dd class="font-medium text-gray-800">
+            {submission.work_link ? <a href={submission.work_link} target="_blank" class="text-brand-600 underline" style="color:#4f46e5">{submission.work_link}</a> : '-'}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-400">발표 자료 링크</dt>
+          <dd class="font-medium text-gray-800">
+            {submission.slide_link ? <a href={submission.slide_link} target="_blank" class="text-brand-600 underline" style="color:#4f46e5">{submission.slide_link}</a> : '-'}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-400">사용한 AI 도구</dt>
+          <dd class="font-medium text-gray-800">{submission.ai_tools || '-'}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-400">제출 시각</dt>
+          <dd class="font-medium text-gray-800">{submittedAt}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="card mb-6 space-y-4 p-6">
+      <h2 class="text-sm font-bold text-gray-400">참가자 정보</h2>
+      <p class="text-sm text-gray-500">
+        참가 형태: <span class="font-semibold text-gray-800">{submission.participation_type === 'team' ? `모둠 (${submission.team_name})` : '개인'}</span>
+      </p>
+      <ul class="divide-y divide-black/5">
+        {
+          submission.participants.map((p, i) => (
+            <li class="flex items-center justify-between py-2 text-sm">
+              <span class="text-gray-400">참가 학생{i + 1}</span>
+              <span class="font-semibold text-gray-800">{p.raw}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <div class="flex gap-4 border-t border-black/5 pt-4 text-xs text-gray-400">
+        <span>개인정보 동의: {submission.privacy_consent ? '✅' : '❌'}</span>
+        <span>전시 동의: {submission.exhibit_consent ? '✅' : '❌'}</span>
+        <span>참가 서약: {submission.pledge_consent ? '✅' : '❌'}</span>
+      </div>
+    </div>
+
+    <form method="POST" class="card space-y-4 p-6">
+      <h2 class="text-sm font-bold text-gray-400">심사 상태</h2>
+      <div>
+        <label class="field-label" for="status">상태</label>
+        <select id="status" name="status" class="input-field">
+          {STATUS_OPTIONS.map((s) => (
+            <option value={s} selected={submission.status === s}>{s}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="admin_note">관리자 메모 (학생에게는 보이지 않아요)</label>
+        <textarea id="admin_note" name="admin_note" rows="3" class="input-field">{submission.admin_note}</textarea>
+      </div>
+      <button type="submit" class="btn-primary w-full">저장하기</button>
+    </form>
+  </main>
+</BaseLayout>

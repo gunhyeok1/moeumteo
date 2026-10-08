@@ -1,0 +1,75 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { getContestBySlug } from '../../../lib/db';
+
+const { slug } = Astro.params;
+const db = env.DB;
+const contest = slug ? await getContestBySlug(db, slug) : null;
+
+if (!contest) {
+  return new Response(null, { status: 404 });
+}
+
+function formatDate(v: string | null) {
+  if (!v) return null;
+  return new Date(v).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+---
+
+<BaseLayout title={`${contest.name} · 모음터`} description={contest.description}>
+  <SiteHeader contestName={contest.name} />
+
+  <main class="mx-auto max-w-3xl px-5 py-14">
+    <div class="card overflow-hidden">
+      <div class="p-8" style="background:linear-gradient(135deg,#eef2ff,#f0fdfa)">
+        {
+          !contest.is_active && (
+            <span class="badge mb-3" style="background:#f1f5f9;color:#475569">접수 마감</span>
+          )
+        }
+        <h1 class="text-2xl font-extrabold text-gray-900 sm:text-3xl">{contest.name}</h1>
+        {
+          (contest.start_at || contest.end_at) && (
+            <p class="mt-3 text-sm font-medium text-gray-500">
+              접수 기간: {formatDate(contest.start_at) ?? '제한 없음'} ~ {formatDate(contest.end_at) ?? '제한 없음'}
+            </p>
+          )
+        }
+      </div>
+
+      <div class="p-8">
+        <p class="whitespace-pre-line leading-relaxed text-gray-700">{contest.description}</p>
+
+        {
+          contest.categories.length > 0 && (
+            <div class="mt-6">
+              <h2 class="field-label">공모 분야</h2>
+              <div class="flex flex-wrap gap-2">
+                {contest.categories.map((cat: string) => (
+                  <span class="badge" style="background:#f1f5f9;color:#334155">{cat}</span>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
+        <div class="mt-8">
+          {
+            contest.is_active ? (
+              <a href={`/c/${contest.slug}/submit`} class="btn-primary w-full sm:w-auto">
+                참가 신청서 작성하기
+              </a>
+            ) : (
+              <p class="text-sm text-gray-400">현재는 접수 기간이 아니에요.</p>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <SiteFooter />
+</BaseLayout>

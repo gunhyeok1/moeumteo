@@ -1,0 +1,150 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdminHeader from '../../../components/AdminHeader.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import { getContestBySlug, listSubmissions, getContestStats } from '../../../lib/db';
+
+const { slug } = Astro.params;
+const db = env.DB;
+const contest = slug ? await getContestBySlug(db, slug) : null;
+
+if (!contest) {
+  return new Response(null, { status: 404 });
+}
+
+const params = Astro.url.searchParams;
+const search = params.get('q') ?? '';
+const status = params.get('status') ?? '';
+const category = params.get('category') ?? '';
+const sort = (params.get('sort') as 'created_at' | 'title' | 'status') ?? 'created_at';
+const order = (params.get('order') as 'asc' | 'desc') ?? 'desc';
+
+const submissions = await listSubmissions(db, {
+  contestId: contest.id,
+  search: search || undefined,
+  status: status || undefined,
+  category: category || undefined,
+  sort,
+  order,
+});
+
+const stats = await getContestStats(db, contest.id);
+const STATUS_OPTIONS = ['접수', '검토중', '통과', '보류', '반려'];
+
+function qs(overrides: Record<string, string>) {
+  const next = new URLSearchParams(params);
+  Object.entries(overrides).forEach(([k, v]) => {
+    if (v) next.set(k, v);
+    else next.delete(k);
+  });
+  return `?${next.toString()}`;
+}
+---
+
+<BaseLayout title={`${contest.name} 제출 관리 · 모음터`}>
+  <AdminHeader title={contest.name} />
+
+  <main class="mx-auto max-w-6xl px-5 py-10">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <a href="/admin" class="text-sm font-medium text-gray-400 hover:text-gray-600">← 목록으로</a>
+        <h1 class="mt-1 text-xl font-extrabold text-gray-900">{contest.name}</h1>
+      </div>
+      <div class="flex gap-2">
+        <a href={`/admin/${contest.slug}/export.csv${Astro.url.search}`} class="btn-secondary text-sm">CSV 내보내기</a>
+        <a href={`/c/${contest.slug}`} target="_blank" class="btn-secondary text-sm">공개 페이지 ↗</a>
+      </div>
+    </div>
+
+    <div class="mb-6 flex flex-wrap gap-2">
+      <a href={qs({ status: '' })} class="badge" style={!status ? 'background:#4338ca;color:white' : 'background:#f1f5f9;color:#475569'}>
+        전체 {stats.total}
+      </a>
+      {
+        STATUS_OPTIONS.map((s) => {
+          const count = stats.byStatus.find((b) => b.status === s)?.count ?? 0;
+          return (
+            <a href={qs({ status: s })} class="badge" style={status === s ? 'background:#4338ca;color:white' : 'background:#f1f5f9;color:#475569'}>
+              {s} {count}
+            </a>
+          );
+        })
+      }
+    </div>
+
+    <form method="GET" class="card mb-6 flex flex-wrap items-end gap-3 p-4">
+      <div class="min-w-[200px] flex-1">
+        <label class="field-label" for="q">검색</label>
+        <input id="q" name="q" class="input-field" placeholder="작품명, 모둠명, 학생명, 접수번호" value={search} />
+      </div>
+      <div>
+        <label class="field-label" for="category">분야</label>
+        <select id="category" name="category" class="input-field">
+          <option value="">전체</option>
+          {contest.categories.map((c: string) => (
+            <option value={c} selected={category === c}>{c}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="sort">정렬</label>
+        <select id="sort" name="sort" class="input-field">
+          <option value="created_at" selected={sort === 'created_at'}>제출일</option>
+          <option value="title" selected={sort === 'title'}>작품명</option>
+          <option value="status" selected={sort === 'status'}>상태</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="order">순서</label>
+        <select id="order" name="order" class="input-field">
+          <option value="desc" selected={order === 'desc'}>내림차순</option>
+          <option value="asc" selected={order === 'asc'}>오름차순</option>
+        </select>
+      </div>
+      <input type="hidden" name="status" value={status} />
+      <button type="submit" class="btn-primary">검색</button>
+    </form>
+
+    <div class="card overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-black/5 text-xs text-gray-400">
+          <tr>
+            <th class="px-4 py-3">접수번호</th>
+            <th class="px-4 py-3">작품 제목</th>
+            <th class="px-4 py-3">분야</th>
+            <th class="px-4 py-3">참가자</th>
+            <th class="px-4 py-3">제출일</th>
+            <th class="px-4 py-3">상태</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            submissions.length === 0 ? (
+              <tr>
+                <td colspan="7" class="px-4 py-14 text-center text-gray-400">조건에 맞는 제출이 없어요.</td>
+              </tr>
+            ) : (
+              submissions.map((s) => (
+                <tr class="border-b border-black/5 last:border-0 hover:bg-gray-50">
+                  <td class="px-4 py-3 font-mono text-xs text-gray-500">{s.id}</td>
+                  <td class="px-4 py-3 font-semibold text-gray-900">{s.title}</td>
+                  <td class="px-4 py-3 text-gray-500">{s.category || '-'}</td>
+                  <td class="px-4 py-3 text-gray-500">
+                    {s.participation_type === 'team' ? `${s.team_name} (${s.participants.length}명)` : (s.participants[0]?.name ?? '-')}
+                  </td>
+                  <td class="px-4 py-3 text-gray-500">{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
+                  <td class="px-4 py-3"><StatusBadge status={s.status} /></td>
+                  <td class="px-4 py-3 text-right">
+                    <a href={`/admin/${contest.slug}/${s.id}`} class="font-semibold text-brand-600" style="color:#4f46e5">상세보기</a>
+                  </td>
+                </tr>
+              ))
+            )
+          }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</BaseLayout>

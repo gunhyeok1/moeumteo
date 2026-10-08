@@ -1,0 +1,52 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { listContests } from '../lib/db';
+
+const db = env.DB;
+const contests = await listContests(db, { activeOnly: true });
+---
+
+<BaseLayout title="모음터 · 학교 공모전 접수 플랫폼">
+  <SiteHeader />
+
+  <main class="mx-auto max-w-5xl px-5 py-14">
+    <section class="text-center">
+      <span class="badge" style="background:#eef2ff;color:#4338ca">모음터</span>
+      <h1 class="mt-5 text-3xl font-extrabold tracking-tight sm:text-4xl">
+        공모전 접수부터 심사까지,<br class="sm:hidden" /> 한 곳에서 간편하게
+      </h1>
+      <p class="mx-auto mt-4 max-w-xl text-gray-500">
+        QR코드 하나로 학생은 바로 참가 신청을 하고, 선생님은 실시간으로 제출 현황을 확인·관리할 수 있어요.
+      </p>
+    </section>
+
+    <section class="mt-12">
+      <h2 class="mb-4 text-lg font-bold text-gray-800">진행 중인 공모전</h2>
+
+      {
+        contests.length === 0 ? (
+          <div class="card p-10 text-center text-gray-400">
+            아직 진행 중인 공모전이 없어요.
+          </div>
+        ) : (
+          <div class="grid gap-4 sm:grid-cols-2">
+            {contests.map((c) => (
+              <a href={`/c/${c.slug}`} class="card block p-6 transition hover:shadow-md hover:-translate-y-0.5">
+                <h3 class="text-lg font-bold text-gray-900">{c.name}</h3>
+                <p class="mt-2 line-clamp-2 text-sm text-gray-500">{c.description}</p>
+                <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-600" style="color:#4f46e5">
+                  참가 신청하기 →
+                </span>
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </section>
+  </main>
+
+  <SiteFooter />
+</BaseLayout>

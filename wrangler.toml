@@ -1,0 +1,10 @@
+name = "contest-platform"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "contest-platform-db"
+# wrangler d1 create contest-platform-db 실행 후 나오는 database_id로 교체하세요.
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"

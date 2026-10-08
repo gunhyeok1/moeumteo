@@ -1,0 +1,82 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import { getContestBySlug, getSubmission } from '../../../lib/db';
+
+const { slug } = Astro.params;
+const id = Astro.url.searchParams.get('id') ?? '';
+const db = env.DB;
+
+const contest = slug ? await getContestBySlug(db, slug) : null;
+const submission = id ? await getSubmission(db, id) : null;
+
+if (!contest || !submission || submission.contest_id !== contest.id) {
+  return new Response(null, { status: 404 });
+}
+
+const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
+---
+
+<BaseLayout title={`접수 완료 · ${contest.name}`}>
+  <SiteHeader contestName={contest.name} />
+
+  <main class="mx-auto max-w-xl px-5 py-14">
+    <div class="card overflow-hidden text-center">
+      <div class="p-10" style="background:linear-gradient(135deg,#eef2ff,#f0fdfa)">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl">✅</div>
+        <h1 class="text-2xl font-extrabold text-gray-900">제출이 완료되었어요!</h1>
+        <p class="mt-2 text-sm text-gray-500">아래 접수번호를 꼭 기억해주세요.</p>
+
+        <div class="mt-6 inline-flex items-center gap-3 rounded-xl bg-white px-6 py-4">
+          <span class="text-2xl font-extrabold tracking-wider text-gray-900" id="receipt-id">{submission.id}</span>
+          <button id="copy-btn" type="button" class="btn-secondary px-3 py-1.5 text-xs">복사</button>
+        </div>
+      </div>
+
+      <div class="space-y-3 p-8 text-left">
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-400">상태</span>
+          <StatusBadge status={submission.status} />
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-400">작품 제목</span>
+          <span class="font-semibold text-gray-800">{submission.title}</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-400">공모 분야</span>
+          <span class="font-semibold text-gray-800">{submission.category || '-'}</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-400">제출 시각</span>
+          <span class="font-semibold text-gray-800">{submittedAt}</span>
+        </div>
+      </div>
+
+      <div class="border-t border-black/5 p-6">
+        <a href="/" class="btn-secondary w-full">홈으로 돌아가기</a>
+      </div>
+    </div>
+  </main>
+
+  <SiteFooter />
+
+  <script>
+    const btn = document.getElementById('copy-btn');
+    const idEl = document.getElementById('receipt-id');
+    btn?.addEventListener('click', async () => {
+      const text = idEl?.textContent ?? '';
+      try {
+        await navigator.clipboard.writeText(text);
+        if (btn) btn.textContent = '복사됨!';
+        setTimeout(() => {
+          if (btn) btn.textContent = '복사';
+        }, 1500);
+      } catch {
+        // 클립보드 권한이 없는 환경 - 무시
+      }
+    });
+  </script>
+</BaseLayout>
