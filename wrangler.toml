@@ -15,4 +15,4 @@ migrations_dir = "migrations"
 binding = "FILES_KV"
 # Cloudflare 대시보드 → Workers & Pages → KV → Create a namespace 로 만든 뒤
 # 그 네임스페이스의 ID로 교체하세요. (R2처럼 결제수단 등록이 필요 없어요.)
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "2975aaa2276b49e7b3bb98330b66ad63"
