@@ -26,8 +26,8 @@ QR코드 하나로 학생은 바로 참가 신청을 하고, 선생님은 실시
 
 학생이 올리는 작품 파일·발표자료 파일을 저장하는 공간입니다. **R2와 달리 결제수단(카드) 등록이 필요 없어요** — Workers 무료 플랜에 기본 포함되어 있습니다. (파일당 최대 20MB, 전체 저장 공간 1GB)
 
-1. [Cloudflare 대시보드](https://dash.cloudflare.com) → 왼쪽 메뉴 **Workers & Pages → KV**
-2. **Create a namespace** 클릭 → 이름을 `moeumteo-files` 같이 입력하고 생성
+1. [Cloudflare 대시보드](https://dash.cloudflare.com) → 왼쪽 메뉴에서 **KV** 찾기 (대시보드 개편으로 위치가 "Workers & Pages" 또는 "Storage & Databases" 쪽일 수 있어요 — 안 보이면 위쪽 검색창에 "KV" 입력)
+2. **Create a namespace**(또는 **Create instance**) 클릭 → 이름을 `moeumteo-files` 같이 입력하고 생성
 3. 생성된 네임스페이스의 **Namespace ID** 를 복사해두세요.
 4. 이 저장소의 `wrangler.toml` 파일을 열어 `id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"` 부분을 방금 복사한 ID로 바꿔서 커밋/푸시 해주세요.
 
