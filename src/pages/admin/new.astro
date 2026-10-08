@@ -17,6 +17,7 @@ let values = {
   allowFreeTopic: true,
   allowTeam: true,
   maxParticipants: 4,
+  videoCategory: '',
   startAt: '',
   endAt: '',
   isActive: true,
@@ -35,6 +36,7 @@ if (Astro.request.method === 'POST') {
     allowFreeTopic: form.get('allow_free_topic') === 'on',
     allowTeam: form.get('allow_team') === 'on',
     maxParticipants: Number(get('max_participants')) || 4,
+    videoCategory: get('video_category'),
     startAt: get('start_at'),
     endAt: get('end_at'),
     isActive: form.get('is_active') === 'on',
@@ -69,6 +71,7 @@ if (Astro.request.method === 'POST') {
       allowFreeTopic: values.allowFreeTopic,
       allowTeam: values.allowTeam,
       maxParticipants: values.maxParticipants,
+      videoCategory: values.videoCategory,
       startAt: values.startAt || null,
       endAt: values.endAt || null,
       isActive: values.isActive,
@@ -129,6 +132,12 @@ if (Astro.request.method === 'POST') {
         <label class="field-label" for="max_participants">참가 학생 최대 인원</label>
         <input id="max_participants" name="max_participants" type="number" min="1" max="10" class="input-field" data-invalid={!!errors.maxParticipants} value={values.maxParticipants} />
         {errors.maxParticipants && <p class="field-error">{errors.maxParticipants}</p>}
+      </div>
+
+      <div>
+        <label class="field-label" for="video_category">영상 링크로 받을 공모 분야 (위 공모 분야 목록과 정확히 똑같이 입력)</label>
+        <input id="video_category" name="video_category" class="input-field" placeholder="예: 영상·유튜브" value={values.videoCategory} />
+        <p class="field-hint">여기 적은 분야를 선택한 학생만 유튜브 등 링크로 제출받고, 나머지 분야는 파일 업로드로 받아요. 비워두면 전체 파일 업로드예요.</p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">

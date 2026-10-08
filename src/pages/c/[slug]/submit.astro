@@ -3,8 +3,9 @@ import { env } from 'cloudflare:workers';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import SiteHeader from '../../../components/SiteHeader.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { getContestBySlug, createSubmission } from '../../../lib/db';
+import { getContestBySlug, createSubmission, attachSubmissionFiles } from '../../../lib/db';
 import { isValidParticipant, parseParticipant, isValidUrl } from '../../../lib/validation';
+import { MAX_FILE_SIZE, uploadSubmissionFile } from '../../../lib/storage';
 
 const { slug } = Astro.params;
 const db = env.DB;
@@ -25,7 +26,6 @@ let values = {
   title: '',
   description: '',
   workLink: '',
-  slideLink: '',
   aiTools: '',
   participationType: 'individual',
   teamName: '',
@@ -48,7 +48,6 @@ if (Astro.request.method === 'POST') {
     title: get('title'),
     description: get('description'),
     workLink: get('work_link'),
-    slideLink: get('slide_link'),
     aiTools: get('ai_tools'),
     participationType: contest.allow_team ? get('participation_type') || 'individual' : 'individual',
     teamName: get('team_name'),
@@ -59,6 +58,14 @@ if (Astro.request.method === 'POST') {
   };
 
   const { privacyConsent, exhibitConsent, pledgeConsent } = values;
+
+  // 영상 분야로 지정된 공모 분야만 링크 입력, 나머지는 파일 업로드
+  const isVideoCategory = !!contest.video_category && values.category === contest.video_category;
+
+  const workFileEntry = form.get('work_file');
+  const slideFileEntry = form.get('slide_file');
+  const workFile = workFileEntry instanceof File && workFileEntry.size > 0 ? workFileEntry : null;
+  const slideFile = slideFileEntry instanceof File && slideFileEntry.size > 0 ? slideFileEntry : null;
 
   if (!values.title) errors.title = '작품 제목을 입력해주세요.';
 
@@ -77,11 +84,16 @@ if (Astro.request.method === 'POST') {
     errors.topic = '공모 주제를 입력해주세요.';
   }
 
-  if (values.workLink && !isValidUrl(values.workLink)) {
-    errors.workLink = 'https:// 로 시작하는 올바른 링크를 입력해주세요.';
+  if (isVideoCategory) {
+    if (values.workLink && !isValidUrl(values.workLink)) {
+      errors.workLink = 'https:// 로 시작하는 올바른 유튜브 링크를 입력해주세요.';
+    }
+  } else if (workFile && workFile.size > MAX_FILE_SIZE) {
+    errors.workFile = '파일 용량이 너무 커요. 20MB 이하 파일로 올려주세요.';
   }
-  if (values.slideLink && !isValidUrl(values.slideLink)) {
-    errors.slideLink = 'https:// 로 시작하는 올바른 링크를 입력해주세요.';
+
+  if (slideFile && slideFile.size > MAX_FILE_SIZE) {
+    errors.slideFile = '파일 용량이 너무 커요. 20MB 이하 파일로 올려주세요.';
   }
 
   if (values.participationType === 'team' && !values.teamName) {
@@ -114,8 +126,8 @@ if (Astro.request.method === 'POST') {
       freeTopicText: values.topicSelect === FREE_TOPIC_VALUE ? values.freeTopicText : '',
       title: values.title,
       description: values.description,
-      workLink: values.workLink,
-      slideLink: values.slideLink,
+      workLink: isVideoCategory ? values.workLink : '',
+      slideLink: '',
       aiTools: values.aiTools,
       participationType: values.participationType,
       teamName: values.participationType === 'team' ? values.teamName : '',
@@ -124,9 +136,22 @@ if (Astro.request.method === 'POST') {
       exhibitConsent,
       pledgeConsent,
     });
+
+    if (!isVideoCategory && workFile) {
+      const meta = await uploadSubmissionFile(env.FILES_KV, contest.slug, id, 'work', workFile);
+      await attachSubmissionFiles(db, id, { workFileKey: meta.key, workFileName: meta.name, workFileSize: meta.size });
+    }
+    if (slideFile) {
+      const meta = await uploadSubmissionFile(env.FILES_KV, contest.slug, id, 'slide', slideFile);
+      await attachSubmissionFiles(db, id, { slideFileKey: meta.key, slideFileName: meta.name, slideFileSize: meta.size });
+    }
+
     return Astro.redirect(`/c/${contest.slug}/complete?id=${id}`, 303);
   }
 }
+
+const videoCategoryJson = JSON.stringify(contest.video_category || '');
+const showWorkLink = !!contest.video_category && values.category === contest.video_category;
 ---
 
 <BaseLayout title={`참가 신청서 · ${contest.name}`}>
@@ -139,7 +164,7 @@ if (Astro.request.method === 'POST') {
       <p class="mt-1 text-sm text-gray-500">참가 신청서를 작성해주세요. 제출 후에는 접수번호로 내용을 확인할 수 있어요.</p>
     </div>
 
-    <form method="POST" class="space-y-6" novalidate>
+    <form method="POST" class="space-y-6" enctype="multipart/form-data" novalidate>
       <section class="card space-y-5 p-6">
         <h2 class="text-base font-bold text-gray-800">작품 정보</h2>
 
@@ -201,16 +226,24 @@ if (Astro.request.method === 'POST') {
           <textarea id="description" name="description" rows="4" class="input-field">{values.description}</textarea>
         </div>
 
-        <div>
-          <label class="field-label" for="work_link">작품 링크</label>
-          <input id="work_link" name="work_link" class="input-field" placeholder="https://..." data-invalid={!!errors.workLink} value={values.workLink} />
+        <div id="work_link_wrap" class:list={[{ hidden: !showWorkLink }]}>
+          <label class="field-label" for="work_link">작품 링크 (유튜브)</label>
+          <input id="work_link" name="work_link" class="input-field" placeholder="https://youtube.com/..." data-invalid={!!errors.workLink} value={values.workLink} />
           {errors.workLink && <p class="field-error">{errors.workLink}</p>}
         </div>
 
+        <div id="work_file_wrap" class:list={[{ hidden: showWorkLink }]}>
+          <label class="field-label" for="work_file">작품 파일</label>
+          <input id="work_file" name="work_file" type="file" class="input-field" data-invalid={!!errors.workFile} />
+          <p class="field-hint">20MB 이하 파일만 올릴 수 있어요.</p>
+          {errors.workFile && <p class="field-error">{errors.workFile}</p>}
+        </div>
+
         <div>
-          <label class="field-label" for="slide_link">발표 자료 링크</label>
-          <input id="slide_link" name="slide_link" class="input-field" placeholder="https://..." data-invalid={!!errors.slideLink} value={values.slideLink} />
-          {errors.slideLink && <p class="field-error">{errors.slideLink}</p>}
+          <label class="field-label" for="slide_file">발표 자료 파일 (선택)</label>
+          <input id="slide_file" name="slide_file" type="file" class="input-field" data-invalid={!!errors.slideFile} />
+          <p class="field-hint">20MB 이하 파일만 올릴 수 있어요.</p>
+          {errors.slideFile && <p class="field-error">{errors.slideFile}</p>}
         </div>
 
         <div>
@@ -301,4 +334,22 @@ if (Astro.request.method === 'POST') {
   </main>
 
   <SiteFooter />
+
+  <script define:vars={{ videoCategoryJson }}>
+    const videoCategory = JSON.parse(videoCategoryJson);
+    const categorySelect = document.getElementById('category');
+    const workLinkWrap = document.getElementById('work_link_wrap');
+    const workFileWrap = document.getElementById('work_file_wrap');
+
+    function updateWorkFieldVisibility() {
+      const isVideo = !!videoCategory && categorySelect && categorySelect.value === videoCategory;
+      if (workLinkWrap) workLinkWrap.classList.toggle('hidden', !isVideo);
+      if (workFileWrap) workFileWrap.classList.toggle('hidden', isVideo);
+    }
+
+    if (categorySelect) {
+      categorySelect.addEventListener('change', updateWorkFieldVisibility);
+    }
+    updateWorkFieldVisibility();
+  </script>
 </BaseLayout>
