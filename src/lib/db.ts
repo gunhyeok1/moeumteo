@@ -10,7 +10,6 @@ export interface Contest {
   allow_free_topic: number;
   allow_team: number;
   max_participants: number;
-  video_category: string; // 이 분야만 작품을 링크(유튜브 등)로 받음. 비우면 전체 파일 업로드
   start_at: string | null;
   end_at: string | null;
   is_active: number;
@@ -27,12 +26,6 @@ export interface Submission {
   description: string;
   work_link: string;
   slide_link: string;
-  work_file_key: string;
-  work_file_name: string;
-  work_file_size: number;
-  slide_file_key: string;
-  slide_file_name: string;
-  slide_file_size: number;
   ai_tools: string;
   participation_type: string;
   team_name: string;
@@ -103,7 +96,6 @@ export interface ContestInput {
   allowFreeTopic: boolean;
   allowTeam: boolean;
   maxParticipants: number;
-  videoCategory?: string; // 이 분야만 작품을 링크로 받음 (비우면 전체 파일 업로드)
   startAt?: string | null;
   endAt?: string | null;
   isActive: boolean;
@@ -113,8 +105,8 @@ export async function createContest(db: D1Database, input: ContestInput) {
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO contests (id, slug, name, description, categories, topics, allow_free_topic, allow_team, max_participants, video_category, start_at, end_at, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO contests (id, slug, name, description, categories, topics, allow_free_topic, allow_team, max_participants, start_at, end_at, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -126,7 +118,6 @@ export async function createContest(db: D1Database, input: ContestInput) {
       input.allowFreeTopic ? 1 : 0,
       input.allowTeam ? 1 : 0,
       input.maxParticipants,
-      input.videoCategory ?? '',
       input.startAt ?? null,
       input.endAt ?? null,
       input.isActive ? 1 : 0
@@ -138,7 +129,7 @@ export async function createContest(db: D1Database, input: ContestInput) {
 export async function updateContest(db: D1Database, id: string, input: ContestInput) {
   await db
     .prepare(
-      `UPDATE contests SET slug = ?, name = ?, description = ?, categories = ?, topics = ?, allow_free_topic = ?, allow_team = ?, max_participants = ?, video_category = ?, start_at = ?, end_at = ?, is_active = ?
+      `UPDATE contests SET slug = ?, name = ?, description = ?, categories = ?, topics = ?, allow_free_topic = ?, allow_team = ?, max_participants = ?, start_at = ?, end_at = ?, is_active = ?
        WHERE id = ?`
     )
     .bind(
@@ -150,7 +141,6 @@ export async function updateContest(db: D1Database, id: string, input: ContestIn
       input.allowFreeTopic ? 1 : 0,
       input.allowTeam ? 1 : 0,
       input.maxParticipants,
-      input.videoCategory ?? '',
       input.startAt ?? null,
       input.endAt ?? null,
       input.isActive ? 1 : 0,
@@ -221,39 +211,6 @@ export async function createSubmission(db: D1Database, input: SubmissionInput): 
 export async function getSubmission(db: D1Database, id: string) {
   const row = await db.prepare('SELECT * FROM submissions WHERE id = ?').bind(id).first<Submission>();
   return row ? parseSubmission(row) : null;
-}
-
-export interface SubmissionFilesInput {
-  workFileKey?: string;
-  workFileName?: string;
-  workFileSize?: number;
-  slideFileKey?: string;
-  slideFileName?: string;
-  slideFileSize?: number;
-}
-
-export async function attachSubmissionFiles(db: D1Database, id: string, files: SubmissionFilesInput) {
-  await db
-    .prepare(
-      `UPDATE submissions SET
-        work_file_key = COALESCE(?, work_file_key),
-        work_file_name = COALESCE(?, work_file_name),
-        work_file_size = COALESCE(?, work_file_size),
-        slide_file_key = COALESCE(?, slide_file_key),
-        slide_file_name = COALESCE(?, slide_file_name),
-        slide_file_size = COALESCE(?, slide_file_size)
-       WHERE id = ?`
-    )
-    .bind(
-      files.workFileKey ?? null,
-      files.workFileName ?? null,
-      files.workFileSize ?? null,
-      files.slideFileKey ?? null,
-      files.slideFileName ?? null,
-      files.slideFileSize ?? null,
-      id
-    )
-    .run();
 }
 
 export interface SubmissionFilters {

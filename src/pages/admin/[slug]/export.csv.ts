@@ -9,14 +9,12 @@ function csvEscape(value: string): string {
   return value;
 }
 
-export const GET: APIRoute = async ({ params, url, locals, request }) => {
+export const GET: APIRoute = async ({ params, url, locals }) => {
   const db = env.DB;
   const contest = params.slug ? await getContestBySlug(db, params.slug) : null;
   if (!contest) {
     return new Response('Not found', { status: 404 });
   }
-
-  const origin = new URL(request.url).origin;
 
   const sp = url.searchParams;
   const submissions = await listSubmissions(db, {
@@ -35,8 +33,7 @@ export const GET: APIRoute = async ({ params, url, locals, request }) => {
     '주제',
     '자유주제내용',
     '작품링크',
-    '작품파일다운로드',
-    '발표자료파일다운로드',
+    '발표자료링크',
     '사용AI도구',
     '참가형태',
     '모둠명',
@@ -53,8 +50,7 @@ export const GET: APIRoute = async ({ params, url, locals, request }) => {
     s.topic,
     s.free_topic_text,
     s.work_link,
-    s.work_file_key ? `${origin}/admin/files/${s.work_file_key}` : '',
-    s.slide_file_key ? `${origin}/admin/files/${s.slide_file_key}` : '',
+    s.slide_link,
     s.ai_tools,
     s.participation_type === 'team' ? '모둠' : '개인',
     s.team_name,
