@@ -6,7 +6,9 @@ QR코드 하나로 학생은 바로 참가 신청을 하고, 선생님은 실시
 - 학생용 페이지: `/` (전체 공모전 목록) → `/c/{주소}` (대회 소개) → `/c/{주소}/submit` (신청서)
 - 관리자 페이지: `/admin` (비밀번호 로그인 필요)
 
-기술 스택: **Astro(SSR) + Cloudflare Pages + Cloudflare D1(데이터베이스)**. GitHub 저장소에 올려두면 Cloudflare Pages가 코드를 푸시할 때마다 자동으로 다시 배포합니다.
+기술 스택: **Astro(SSR) + Cloudflare Workers + Cloudflare D1(데이터베이스)**. GitHub 저장소에 올려두면 Cloudflare Workers Builds가 코드를 푸시할 때마다 자동으로 다시 배포합니다.
+
+> 참고: Cloudflare "Pages"가 아니라 **Workers**로 배포합니다. (Pages는 이 Astro 어댑터 버전과 호환 문제가 있어요 — `ASSETS` 바인딩 이름 충돌로 빌드가 실패합니다.) Cloudflare 대시보드에서 앱 생성 시 "Continue with GitHub"(통합 Workers 플로우)를 선택하면 됩니다. 맨 아래 "레거시 Pages 워크플로" 쪽은 사용하지 마세요.
 
 ---
 
@@ -20,36 +22,27 @@ QR코드 하나로 학생은 바로 참가 신청을 하고, 선생님은 실시
 4. 이 저장소의 `wrangler.toml` 파일을 열어 `database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"` 부분을 방금 복사한 ID로 바꿔서 커밋/푸시 해주세요.
 5. 같은 데이터베이스 화면의 **Console** 탭을 열고, 이 저장소의 `migrations/0001_init.sql` 파일 내용을 그대로 복사해서 붙여넣고 실행하세요. (테이블이 만들어집니다)
 
-### 1-2. GitHub 저장소 연결 + Cloudflare Pages 생성
+### 1-2. GitHub 저장소 연결 + Cloudflare Workers 프로젝트 생성
 
 1. 이 프로젝트 코드를 GitHub 저장소에 올립니다 (push).
-2. Cloudflare 대시보드 → **Workers & Pages** → **Create application** → **Pages** 탭 → **Connect to Git**
-3. 방금 올린 저장소를 선택
+2. Cloudflare 대시보드 → **Workers & Pages** → **애플리케이션 생성(Create application)** → **"Continue with GitHub"** 선택 (레거시 Pages 워크플로 아님)
+3. 방금 올린 저장소(`moeumteo`) 선택
 4. 빌드 설정:
    - **Framework preset**: Astro
    - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-5. **Save and Deploy** 를 누르기 전에, 아래 "환경 변수"와 "D1 바인딩"을 먼저 설정하는 것을 권장합니다. (배포 후에도 Settings에서 설정할 수 있어요)
+   - (Workers 플로우에는 "빌드 출력 디렉터리" 입력란이 없어요 — `wrangler.toml`이 알아서 처리합니다)
+5. 환경 변수(비밀값)를 추가:
 
-### 1-3. D1 바인딩 연결
+   | 변수명 | 값 |
+   |---|---|
+   | `ADMIN_PASSWORD` | 선생님이 로그인할 때 쓸 비밀번호 (직접 정하기) |
+   | `SESSION_SECRET` | 아무 긴 임의의 문자열 (32자 이상 권장) |
 
-Pages 프로젝트 → **Settings → Functions → D1 database bindings → Add binding**
+6. **저장 및 배포**
 
-- Variable name: `DB`
-- D1 database: 1-1에서 만든 `contest-platform-db` 선택
+D1 바인딩은 `wrangler.toml`에 이미 적혀있기 때문에 (1-1에서 database_id만 채웠다면) 별도 설정 없이 자동으로 연결됩니다.
 
-### 1-4. 환경 변수(비밀값) 설정
-
-Pages 프로젝트 → **Settings → Environment variables → Add variable** (Production 환경에 추가, **Encrypt** 체크)
-
-| 변수명 | 값 |
-|---|---|
-| `ADMIN_PASSWORD` | 선생님이 로그인할 때 쓸 비밀번호 (직접 정하기) |
-| `SESSION_SECRET` | 아무 긴 임의의 문자열 (예: 32자 이상 랜덤 문자열) |
-
-변수 추가 후 **Retry deployment** 를 눌러 다시 배포하면 완료입니다.
-
-배포가 끝나면 `https://(프로젝트이름).pages.dev` 주소가 생성됩니다. 이 주소가 사이트의 기본 주소예요.
+배포가 끝나면 `https://(프로젝트이름).(계정서브도메인).workers.dev` 주소가 생성됩니다. 이 주소가 사이트의 기본 주소예요.
 
 ---
 
@@ -57,11 +50,11 @@ Pages 프로젝트 → **Settings → Environment variables → Add variable** (
 
 ### 2-1. 새 공모전 만들기 (관리자)
 
-1. `https://your-site.pages.dev/admin/login` 접속 → 비밀번호 입력
+1. `https://your-site.workers.dev/admin/login` 접속 → 비밀번호 입력
 2. **+ 새 공모전 만들기** 클릭
 3. 이름, 주소(slug), 공모 분야/주제 목록(한 줄에 하나씩, 비워두면 학생이 직접 입력하는 자유 입력란이 돼요), 참가 인원 등을 입력하고 저장
 
-생성되면 `https://your-site.pages.dev/c/{주소}` 가 학생들이 접속할 신청 페이지가 됩니다. 이 주소로 QR코드를 만들어서 공유하면 돼요.
+생성되면 `https://your-site.workers.dev/c/{주소}` 가 학생들이 접속할 신청 페이지가 됩니다. 이 주소로 QR코드를 만들어서 공유하면 돼요.
 
 ### 2-2. 제출 관리
 
