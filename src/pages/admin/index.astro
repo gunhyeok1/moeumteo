@@ -9,7 +9,7 @@ const contests = await listContests(db);
 const statsList = await Promise.all(contests.map((c) => getContestStats(db, c.id)));
 ---
 
-<BaseLayout title="대회 관리 · 모음터">
+<BaseLayout title="대회 관리 · 함께 만드는 안전 디지털 세상">
   <AdminHeader />
 
   <main class="mx-auto max-w-6xl px-5 py-10">
