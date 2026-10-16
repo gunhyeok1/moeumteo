@@ -8,7 +8,7 @@ export const GET: APIRoute = async ({ params }) => {
     return new Response('Not found', { status: 404 });
   }
 
-  const file = await getSubmissionFile(env.FILES_KV, key);
+  const file = await getSubmissionFile(env, key);
   if (!file) {
     return new Response('파일을 찾을 수 없어요.', { status: 404 });
   }

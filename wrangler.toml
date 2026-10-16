@@ -16,3 +16,10 @@ binding = "FILES_KV"
 # Cloudflare 대시보드 → Workers & Pages → KV → Create a namespace 로 만든 뒤
 # 그 네임스페이스의 ID로 교체하세요. (R2처럼 결제수단 등록이 필요 없어요.)
 id = "2975aaa2276b49e7b3bb98330b66ad63"
+
+[[r2_buckets]]
+binding = "FILES_R2"
+# 영상 분야 작품 파일만 여기 저장됩니다 (용량이 커서 KV로는 부족).
+# Cloudflare 대시보드 → R2 → 버킷 생성할 때 이름을 아래와 똑같이 "moeumteo-videos"로
+# 만들면 코드 수정 없이 바로 연결됩니다. (KV와 달리 ID가 아니라 이름 그대로 씁니다)
+bucket_name = "moeumteo-videos"
