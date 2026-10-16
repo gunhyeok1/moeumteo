@@ -144,9 +144,11 @@ const saved = Astro.url.searchParams.get('saved') === '1';
       </div>
 
       <div>
-        <label class="field-label" for="video_category">영상(대용량 파일)으로 받을 공모 분야 (위 공모 분야 목록과 정확히 똑같이 입력)</label>
-        <input id="video_category" name="video_category" class="input-field" placeholder="예: 영상·유튜브" value={values.videoCategory} />
-        <p class="field-hint">여기 적은 분야를 선택한 학생은 작품 파일을 최대 98MB(영상용)까지 올릴 수 있고, 나머지 분야는 20MB까지만 올릴 수 있어요. 비워두면 전체 20MB 제한이에요.</p>
+        <label class="field-label" for="video_category">영상(대용량 파일)으로 받을 공모 분야</label>
+        <select id="video_category" name="video_category" class="input-field">
+          <option value="">선택 안 함 (전체 20MB 제한)</option>
+        </select>
+        <p class="field-hint">위 공모 분야 목록에 글자를 입력하면 선택지가 자동으로 채워져요. 여기서 고른 분야를 선택한 학생은 작품 파일을 최대 98MB(영상용)까지 올릴 수 있고, 나머지 분야는 20MB까지만 올릴 수 있어요. 비워두면 전체 20MB 제한이에요.</p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
@@ -168,4 +170,39 @@ const saved = Astro.url.searchParams.get('saved') === '1';
       <button type="submit" class="btn-primary w-full">저장하기</button>
     </form>
   </main>
+
+  <script define:vars={{ initialVideoCategory: values.videoCategory }}>
+    const categoriesTextarea = document.getElementById('categories');
+    const videoCategorySelect = document.getElementById('video_category');
+    let selectedValue = initialVideoCategory || '';
+
+    function rebuildVideoCategoryOptions() {
+      const categories = categoriesTextarea.value
+        .split('\n')
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+      videoCategorySelect.innerHTML = '';
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = '선택 안 함 (전체 20MB 제한)';
+      videoCategorySelect.appendChild(emptyOpt);
+
+      categories.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        if (c === selectedValue) opt.selected = true;
+        videoCategorySelect.appendChild(opt);
+      });
+    }
+
+    if (categoriesTextarea && videoCategorySelect) {
+      videoCategorySelect.addEventListener('change', () => {
+        selectedValue = videoCategorySelect.value;
+      });
+      categoriesTextarea.addEventListener('input', rebuildVideoCategoryOptions);
+      rebuildVideoCategoryOptions();
+    }
+  </script>
 </BaseLayout>
