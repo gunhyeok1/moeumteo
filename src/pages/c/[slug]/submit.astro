@@ -84,7 +84,7 @@ if (Astro.request.method === 'POST') {
 
   if (isVideoCategory) {
     if (workFile && workFile.size > MAX_VIDEO_FILE_SIZE) {
-      errors.workFile = '영상 용량이 너무 커요. 95MB 이하로 압축해서 올려주세요.';
+      errors.workFile = '영상 용량이 너무 커요. 98MB 이하로 압축해서 올려주세요.';
     }
   } else if (workFile && workFile.size > MAX_FILE_SIZE) {
     errors.workFile = '파일 용량이 너무 커요. 20MB 이하 파일로 올려주세요.';
@@ -337,7 +337,7 @@ const videoCategoryJson = JSON.stringify(contest.video_category || '');
       const isVideo = !!videoCategory && categorySelect && categorySelect.value === videoCategory;
       if (workFileHint) {
         workFileHint.textContent = isVideo
-          ? '영상 파일은 95MB 이하까지 올릴 수 있어요. (너무 크면 압축해서 올려주세요)'
+          ? '영상 파일은 98MB 이하까지 올릴 수 있어요. (너무 크면 압축해서 올려주세요)'
           : '20MB 이하 파일만 올릴 수 있어요.';
       }
     }
