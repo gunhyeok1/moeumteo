@@ -91,6 +91,16 @@ export async function getSubmissionFile(env: { FILES_KV: KVNamespace; FILES_R2?:
   };
 }
 
+// 제출 삭제 시 KV/R2에 올라가 있는 실제 파일도 같이 지우기 위한 함수
+export async function deleteSubmissionFile(env: { FILES_KV: KVNamespace; FILES_R2?: R2Bucket }, key: string): Promise<void> {
+  if (key.startsWith(R2_KEY_PREFIX)) {
+    if (!env.FILES_R2) return;
+    await env.FILES_R2.delete(key.slice(R2_KEY_PREFIX.length));
+    return;
+  }
+  await env.FILES_KV.delete(key);
+}
+
 export function formatFileSize(bytes: number): string {
   if (!bytes || bytes <= 0) return '-';
   if (bytes < 1024) return `${bytes}B`;

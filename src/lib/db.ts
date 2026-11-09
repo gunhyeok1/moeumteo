@@ -300,6 +300,10 @@ export async function updateSubmissionStatus(db: D1Database, id: string, status:
     .run();
 }
 
+export async function deleteSubmission(db: D1Database, id: string) {
+  await db.prepare('DELETE FROM submissions WHERE id = ?').bind(id).run();
+}
+
 export async function getContestStats(db: D1Database, contestId: string) {
   const { results } = await db
     .prepare('SELECT status, COUNT(*) as count FROM submissions WHERE contest_id = ? GROUP BY status')

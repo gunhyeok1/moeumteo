@@ -3,8 +3,8 @@ import { env } from 'cloudflare:workers';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import AdminHeader from '../../../components/AdminHeader.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
-import { getContestBySlug, getSubmission, updateSubmissionStatus } from '../../../lib/db';
-import { formatFileSize } from '../../../lib/storage';
+import { getContestBySlug, getSubmission, updateSubmissionStatus, deleteSubmission } from '../../../lib/db';
+import { formatFileSize, deleteSubmissionFile } from '../../../lib/storage';
 
 const { slug, id } = Astro.params;
 const db = env.DB;
@@ -19,6 +19,15 @@ const STATUS_OPTIONS = ['접수', '검토중', '통과', '보류', '반려'];
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
+  const action = String(form.get('_action') ?? 'update_status');
+
+  if (action === 'delete') {
+    if (submission.work_file_key) await deleteSubmissionFile(env, submission.work_file_key);
+    if (submission.slide_file_key) await deleteSubmissionFile(env, submission.slide_file_key);
+    await deleteSubmission(db, submission.id);
+    return Astro.redirect(`/admin/${contest.slug}?deleted=1`, 303);
+  }
+
   const status = String(form.get('status') ?? submission.status);
   const adminNote = String(form.get('admin_note') ?? '');
   await updateSubmissionStatus(db, submission.id, status, adminNote);
@@ -140,6 +149,17 @@ const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
         <textarea id="admin_note" name="admin_note" rows="3" class="input-field">{submission.admin_note}</textarea>
       </div>
       <button type="submit" class="btn-primary w-full">저장하기</button>
+    </form>
+
+    <form
+      method="POST"
+      class="mt-4"
+      onsubmit="return confirm('이 제출물을 완전히 삭제할까요? 첨부된 파일도 함께 삭제되고, 되돌릴 수 없어요.');"
+    >
+      <input type="hidden" name="_action" value="delete" />
+      <button type="submit" class="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100">
+        이 제출물 삭제하기
+      </button>
     </form>
   </main>
 </BaseLayout>

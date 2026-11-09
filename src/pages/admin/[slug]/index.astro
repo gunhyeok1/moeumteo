@@ -40,6 +40,9 @@ function qs(overrides: Record<string, string>) {
   });
   return `?${next.toString()}`;
 }
+
+const deleted = params.get('deleted') === '1';
+const currentQs = Astro.url.search;
 ---
 
 <BaseLayout title={`${contest.name} 제출 관리 · 함께 만드는 안전 디지털 세상`}>
@@ -106,45 +109,87 @@ function qs(overrides: Record<string, string>) {
       <button type="submit" class="btn-primary">검색</button>
     </form>
 
-    <div class="card overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-black/5 text-xs text-gray-400">
-          <tr>
-            <th class="px-4 py-3">접수번호</th>
-            <th class="px-4 py-3">작품 제목</th>
-            <th class="px-4 py-3">분야</th>
-            <th class="px-4 py-3">참가자</th>
-            <th class="px-4 py-3">제출일</th>
-            <th class="px-4 py-3">상태</th>
-            <th class="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            submissions.length === 0 ? (
-              <tr>
-                <td colspan="7" class="px-4 py-14 text-center text-gray-400">조건에 맞는 제출이 없어요.</td>
-              </tr>
-            ) : (
-              submissions.map((s) => (
-                <tr class="border-b border-black/5 last:border-0 hover:bg-gray-50">
-                  <td class="px-4 py-3 font-mono text-xs text-gray-500">{s.id}</td>
-                  <td class="px-4 py-3 font-semibold text-gray-900">{s.title}</td>
-                  <td class="px-4 py-3 text-gray-500">{s.category || '-'}</td>
-                  <td class="px-4 py-3 text-gray-500">
-                    {s.participation_type === 'team' ? `${s.team_name} (${s.participants.length}명)` : (s.participants[0]?.name ?? '-')}
-                  </td>
-                  <td class="px-4 py-3 text-gray-500">{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
-                  <td class="px-4 py-3"><StatusBadge status={s.status} /></td>
-                  <td class="px-4 py-3 text-right">
-                    <a href={`/admin/${contest.slug}/${s.id}`} class="font-semibold text-brand-600" style="color:#4f46e5">상세보기</a>
-                  </td>
+    {deleted && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">선택한 제출물을 삭제했어요.</div>}
+
+    <form
+      id="bulk_delete_form"
+      method="POST"
+      action={`/admin/${contest.slug}/bulk-delete`}
+      onsubmit="return confirm('선택한 제출물을 완전히 삭제할까요? 첨부된 파일도 함께 삭제되고, 되돌릴 수 없어요.');"
+    >
+      <input type="hidden" name="redirect_qs" value={currentQs} />
+
+      <div class="mb-3 flex items-center justify-between">
+        <label class="flex items-center gap-2 text-sm text-gray-500">
+          <input type="checkbox" id="select_all" />
+          전체 선택
+        </label>
+        <button type="submit" id="bulk_delete_btn" class="btn-secondary text-sm text-red-600" disabled>선택 삭제</button>
+      </div>
+
+      <div class="card overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-black/5 text-xs text-gray-400">
+            <tr>
+              <th class="px-4 py-3"></th>
+              <th class="px-4 py-3">접수번호</th>
+              <th class="px-4 py-3">작품 제목</th>
+              <th class="px-4 py-3">분야</th>
+              <th class="px-4 py-3">참가자</th>
+              <th class="px-4 py-3">제출일</th>
+              <th class="px-4 py-3">상태</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              submissions.length === 0 ? (
+                <tr>
+                  <td colspan="8" class="px-4 py-14 text-center text-gray-400">조건에 맞는 제출이 없어요.</td>
                 </tr>
-              ))
-            )
-          }
-        </tbody>
-      </table>
-    </div>
+              ) : (
+                submissions.map((s) => (
+                  <tr class="border-b border-black/5 last:border-0 hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                      <input type="checkbox" name="ids" value={s.id} class="row-checkbox" />
+                    </td>
+                    <td class="px-4 py-3 font-mono text-xs text-gray-500">{s.id}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-900">{s.title}</td>
+                    <td class="px-4 py-3 text-gray-500">{s.category || '-'}</td>
+                    <td class="px-4 py-3 text-gray-500">
+                      {s.participation_type === 'team' ? `${s.team_name} (${s.participants.length}명)` : (s.participants[0]?.name ?? '-')}
+                    </td>
+                    <td class="px-4 py-3 text-gray-500">{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
+                    <td class="px-4 py-3"><StatusBadge status={s.status} /></td>
+                    <td class="px-4 py-3 text-right">
+                      <a href={`/admin/${contest.slug}/${s.id}`} class="font-semibold text-brand-600" style="color:#4f46e5">상세보기</a>
+                    </td>
+                  </tr>
+                ))
+              )
+            }
+          </tbody>
+        </table>
+      </div>
+    </form>
   </main>
+
+  <script>
+    const selectAll = document.getElementById('select_all') as HTMLInputElement | null;
+    const bulkBtn = document.getElementById('bulk_delete_btn') as HTMLButtonElement | null;
+    const rowCheckboxes = Array.from(document.querySelectorAll<HTMLInputElement>('.row-checkbox'));
+
+    function updateBulkButton() {
+      const anyChecked = rowCheckboxes.some((c) => c.checked);
+      if (bulkBtn) bulkBtn.disabled = !anyChecked;
+    }
+
+    selectAll?.addEventListener('change', () => {
+      rowCheckboxes.forEach((c) => (c.checked = selectAll.checked));
+      updateBulkButton();
+    });
+
+    rowCheckboxes.forEach((c) => c.addEventListener('change', updateBulkButton));
+    updateBulkButton();
+  </script>
 </BaseLayout>
