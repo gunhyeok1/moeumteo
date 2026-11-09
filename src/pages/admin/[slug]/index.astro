@@ -152,6 +152,7 @@ const currentQs = Astro.url.search;
           <thead class="border-b border-black/5 text-xs text-gray-400">
             <tr>
               <th class="px-4 py-3"></th>
+              <th class="px-4 py-3">번호</th>
               <th class="px-4 py-3">접수번호</th>
               <th class="px-4 py-3">작품 제목</th>
               <th class="px-4 py-3">분야</th>
@@ -165,15 +166,16 @@ const currentQs = Astro.url.search;
             {
               submissions.length === 0 ? (
                 <tr>
-                  <td colspan="8" class="px-4 py-14 text-center text-gray-400">조건에 맞는 제출이 없어요.</td>
+                  <td colspan="9" class="px-4 py-14 text-center text-gray-400">조건에 맞는 제출이 없어요.</td>
                 </tr>
               ) : (
-                submissions.map((s) => (
+                submissions.map((s, i) => (
                   <Fragment>
                     <tr class={s.admin_note ? 'hover:bg-gray-50' : 'border-b border-black/5 last:border-0 hover:bg-gray-50'}>
                       <td class="px-4 py-3">
                         <input type="checkbox" name="ids" value={s.id} class="row-checkbox" />
                       </td>
+                      <td class="px-4 py-3 text-gray-400">{i + 1}</td>
                       <td class="px-4 py-3 font-mono text-xs text-gray-500">{s.id}</td>
                       <td class="px-4 py-3 font-semibold text-gray-900">{s.title}</td>
                       <td class="px-4 py-3 text-gray-500">{s.category || '-'}</td>
@@ -189,7 +191,7 @@ const currentQs = Astro.url.search;
                     {
                       s.admin_note && (
                         <tr class="border-b-2 border-gray-200 last:border-0 bg-amber-50/60">
-                          <td class="py-1.5"></td>
+                          <td class="py-1.5" colspan="2"></td>
                           <td colspan="7" class="px-4 py-1.5 pl-6 text-xs text-amber-800">
                             <span class="font-semibold">↳ 메모:</span> <span class="whitespace-pre-line">{s.admin_note}</span>
                           </td>
