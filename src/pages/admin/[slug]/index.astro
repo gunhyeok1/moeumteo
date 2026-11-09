@@ -170,7 +170,7 @@ const currentQs = Astro.url.search;
               ) : (
                 submissions.map((s) => (
                   <Fragment>
-                    <tr class={`border-b border-black/5 hover:bg-gray-50 ${s.admin_note ? '' : 'last:border-0'}`}>
+                    <tr class={s.admin_note ? 'hover:bg-gray-50' : 'border-b border-black/5 last:border-0 hover:bg-gray-50'}>
                       <td class="px-4 py-3">
                         <input type="checkbox" name="ids" value={s.id} class="row-checkbox" />
                       </td>
@@ -188,10 +188,10 @@ const currentQs = Astro.url.search;
                     </tr>
                     {
                       s.admin_note && (
-                        <tr class="border-b border-black/5 last:border-0 bg-amber-50/60">
-                          <td class="px-4 py-2"></td>
-                          <td colspan="7" class="px-4 py-2 text-xs text-amber-800">
-                            <span class="font-semibold">메모:</span> <span class="whitespace-pre-line">{s.admin_note}</span>
+                        <tr class="border-b-2 border-gray-200 last:border-0 bg-amber-50/60">
+                          <td class="py-1.5"></td>
+                          <td colspan="7" class="px-4 py-1.5 pl-6 text-xs text-amber-800">
+                            <span class="font-semibold">↳ 메모:</span> <span class="whitespace-pre-line">{s.admin_note}</span>
                           </td>
                         </tr>
                       )
