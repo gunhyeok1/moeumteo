@@ -3,7 +3,7 @@ import { env } from 'cloudflare:workers';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import AdminHeader from '../../../components/AdminHeader.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
-import { getContestBySlug, listSubmissions, getContestStats } from '../../../lib/db';
+import { getContestBySlug, listSubmissions, getContestStats, DELETED_STATUS } from '../../../lib/db';
 
 const { slug } = Astro.params;
 const db = env.DB;
@@ -24,6 +24,7 @@ const submissions = await listSubmissions(db, {
   contestId: contest.id,
   search: search || undefined,
   status: status || undefined,
+  excludeStatus: status ? undefined : DELETED_STATUS,
   category: category || undefined,
   sort,
   order,
@@ -31,6 +32,11 @@ const submissions = await listSubmissions(db, {
 
 const stats = await getContestStats(db, contest.id);
 const STATUS_OPTIONS = ['접수', '검토중', '통과', '보류', '반려'];
+const activeTotal = stats.byStatus
+  .filter((b) => b.status !== DELETED_STATUS)
+  .reduce((sum, b) => sum + b.count, 0);
+const deletedCount = stats.byStatus.find((b) => b.status === DELETED_STATUS)?.count ?? 0;
+const viewingDeleted = status === DELETED_STATUS;
 
 function qs(overrides: Record<string, string>) {
   const next = new URLSearchParams(params);
@@ -42,6 +48,7 @@ function qs(overrides: Record<string, string>) {
 }
 
 const deleted = params.get('deleted') === '1';
+const restored = params.get('restored') === '1';
 const currentQs = Astro.url.search;
 ---
 
@@ -62,7 +69,7 @@ const currentQs = Astro.url.search;
 
     <div class="mb-6 flex flex-wrap gap-2">
       <a href={qs({ status: '' })} class="badge" style={!status ? 'background:#4338ca;color:white' : 'background:#f1f5f9;color:#475569'}>
-        전체 {stats.total}
+        전체 {activeTotal}
       </a>
       {
         STATUS_OPTIONS.map((s) => {
@@ -74,6 +81,9 @@ const currentQs = Astro.url.search;
           );
         })
       }
+      <a href={qs({ status: DELETED_STATUS })} class="badge" style={viewingDeleted ? 'background:#1f2937;color:white' : 'background:#f1f5f9;color:#475569'}>
+        삭제함 {deletedCount}
+      </a>
     </div>
 
     <form method="GET" class="card mb-6 flex flex-wrap items-end gap-3 p-4">
@@ -109,13 +119,17 @@ const currentQs = Astro.url.search;
       <button type="submit" class="btn-primary">검색</button>
     </form>
 
-    {deleted && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">선택한 제출물을 삭제했어요.</div>}
+    {deleted && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">선택한 제출물을 삭제함으로 옮겼어요. "삭제함" 탭에서 다시 복구할 수 있어요.</div>}
+    {restored && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">선택한 제출물을 복구했어요.</div>}
+    {viewingDeleted && <div class="mb-4 rounded-lg bg-gray-800 px-4 py-3 text-sm font-medium text-white">삭제함으로 분류된 제출물이에요. 공개 페이지·CSV에는 나오지 않고, 선택 복구로 되돌릴 수 있어요.</div>}
 
     <form
       id="bulk_delete_form"
       method="POST"
-      action={`/admin/${contest.slug}/bulk-delete`}
-      onsubmit="return confirm('선택한 제출물을 완전히 삭제할까요? 첨부된 파일도 함께 삭제되고, 되돌릴 수 없어요.');"
+      action={`/admin/${contest.slug}/${viewingDeleted ? 'bulk-restore' : 'bulk-delete'}`}
+      onsubmit={viewingDeleted
+        ? "return confirm('선택한 제출물을 접수 상태로 복구할까요?');"
+        : "return confirm('선택한 제출물을 삭제함으로 옮길까요? 파일은 지워지지 않고, \\'삭제함\\' 탭에서 다시 복구할 수 있어요.');"}
     >
       <input type="hidden" name="redirect_qs" value={currentQs} />
 
@@ -124,7 +138,13 @@ const currentQs = Astro.url.search;
           <input type="checkbox" id="select_all" />
           전체 선택
         </label>
-        <button type="submit" id="bulk_delete_btn" class="btn-secondary text-sm text-red-600" disabled>선택 삭제</button>
+        {
+          viewingDeleted ? (
+            <button type="submit" id="bulk_delete_btn" class="btn-secondary text-sm text-green-700" disabled>선택 복구</button>
+          ) : (
+            <button type="submit" id="bulk_delete_btn" class="btn-secondary text-sm text-red-600" disabled>선택 삭제</button>
+          )
+        }
       </div>
 
       <div class="card overflow-x-auto">

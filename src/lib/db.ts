@@ -1,5 +1,9 @@
 import { generateReceiptId } from './validation';
 
+// 실제로 지우지 않고 이 상태로 분류해서 목록에서만 숨기는 "삭제함" 처리용 상태값.
+// 파일/DB 레코드는 그대로 남아있어서 필요하면 다시 복구(상태를 되돌림)할 수 있음.
+export const DELETED_STATUS = '삭제';
+
 export interface Contest {
   id: string;
   slug: string;
@@ -260,6 +264,7 @@ export interface SubmissionFilters {
   contestId: string;
   search?: string;
   status?: string;
+  excludeStatus?: string;
   category?: string;
   sort?: 'created_at' | 'title' | 'status';
   order?: 'asc' | 'desc';
@@ -272,6 +277,9 @@ export async function listSubmissions(db: D1Database, filters: SubmissionFilters
   if (filters.status) {
     conditions.push('status = ?');
     params.push(filters.status);
+  } else if (filters.excludeStatus) {
+    conditions.push('status != ?');
+    params.push(filters.excludeStatus);
   }
   if (filters.category) {
     conditions.push('category = ?');
@@ -297,6 +305,14 @@ export async function updateSubmissionStatus(db: D1Database, id: string, status:
   await db
     .prepare(`UPDATE submissions SET status = ?, admin_note = ?, updated_at = datetime('now') WHERE id = ?`)
     .bind(status, adminNote ?? '', id)
+    .run();
+}
+
+// 관리자 메모는 건드리지 않고 상태만 바꿀 때 (삭제함 처리 / 복구용)
+export async function setSubmissionStatus(db: D1Database, id: string, status: string) {
+  await db
+    .prepare(`UPDATE submissions SET status = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(status, id)
     .run();
 }
 

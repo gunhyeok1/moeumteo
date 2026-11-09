@@ -3,13 +3,13 @@ import { env } from 'cloudflare:workers';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import AdminHeader from '../../../components/AdminHeader.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
-import { getContestBySlug, getSubmission, updateSubmissionStatus, deleteSubmission } from '../../../lib/db';
-import { formatFileSize, deleteSubmissionFile } from '../../../lib/storage';
+import { getContestBySlug, getSubmission, updateSubmissionStatus, setSubmissionStatus, DELETED_STATUS } from '../../../lib/db';
+import { formatFileSize } from '../../../lib/storage';
 
 const { slug, id } = Astro.params;
 const db = env.DB;
 const contest = slug ? await getContestBySlug(db, slug) : null;
-const submission = id ? await getSubmission(db, id) : null;
+let submission = id ? await getSubmission(db, id) : null;
 
 if (!contest || !submission || submission.contest_id !== contest.id) {
   return new Response(null, { status: 404 });
@@ -21,11 +21,15 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = String(form.get('_action') ?? 'update_status');
 
+  // 실제로 지우지 않고 "삭제함" 상태로 옮김 — 파일/기록은 그대로 남아서 복구 가능
   if (action === 'delete') {
-    if (submission.work_file_key) await deleteSubmissionFile(env, submission.work_file_key);
-    if (submission.slide_file_key) await deleteSubmissionFile(env, submission.slide_file_key);
-    await deleteSubmission(db, submission.id);
+    await setSubmissionStatus(db, submission.id, DELETED_STATUS);
     return Astro.redirect(`/admin/${contest.slug}?deleted=1`, 303);
+  }
+
+  if (action === 'restore') {
+    await setSubmissionStatus(db, submission.id, '접수');
+    return Astro.redirect(`/admin/${contest.slug}/${submission.id}?restored=1`, 303);
   }
 
   const status = String(form.get('status') ?? submission.status);
@@ -35,6 +39,8 @@ if (Astro.request.method === 'POST') {
 }
 
 const saved = Astro.url.searchParams.get('saved') === '1';
+const restored = Astro.url.searchParams.get('restored') === '1';
+const isDeleted = submission.status === DELETED_STATUS;
 const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
 ---
 
@@ -53,6 +59,8 @@ const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
     </div>
 
     {saved && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">저장되었어요.</div>}
+    {restored && <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">복구됐어요.</div>}
+    {isDeleted && <div class="mb-4 rounded-lg bg-gray-800 px-4 py-3 text-sm font-medium text-white">삭제함으로 분류된 제출물이에요. 아래 "복구하기" 버튼으로 되돌릴 수 있어요.</div>}
 
     <div class="card mb-6 space-y-4 p-6">
       <h2 class="text-sm font-bold text-gray-400">작품 정보</h2>
@@ -151,15 +159,26 @@ const submittedAt = new Date(submission.created_at).toLocaleString('ko-KR');
       <button type="submit" class="btn-primary w-full">저장하기</button>
     </form>
 
-    <form
-      method="POST"
-      class="mt-4"
-      onsubmit="return confirm('이 제출물을 완전히 삭제할까요? 첨부된 파일도 함께 삭제되고, 되돌릴 수 없어요.');"
-    >
-      <input type="hidden" name="_action" value="delete" />
-      <button type="submit" class="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100">
-        이 제출물 삭제하기
-      </button>
-    </form>
+    {
+      isDeleted ? (
+        <form method="POST" class="mt-4">
+          <input type="hidden" name="_action" value="restore" />
+          <button type="submit" class="w-full rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-100">
+            이 제출물 복구하기
+          </button>
+        </form>
+      ) : (
+        <form
+          method="POST"
+          class="mt-4"
+          onsubmit="return confirm('이 제출물을 삭제함으로 옮길까요? 파일은 지워지지 않고, 목록에서 \'삭제함\'으로 들어가면 다시 복구할 수 있어요.');"
+        >
+          <input type="hidden" name="_action" value="delete" />
+          <button type="submit" class="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100">
+            이 제출물 삭제하기
+          </button>
+        </form>
+      )
+    }
   </main>
 </BaseLayout>
