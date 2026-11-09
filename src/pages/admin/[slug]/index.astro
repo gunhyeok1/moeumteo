@@ -169,22 +169,34 @@ const currentQs = Astro.url.search;
                 </tr>
               ) : (
                 submissions.map((s) => (
-                  <tr class="border-b border-black/5 last:border-0 hover:bg-gray-50">
-                    <td class="px-4 py-3">
-                      <input type="checkbox" name="ids" value={s.id} class="row-checkbox" />
-                    </td>
-                    <td class="px-4 py-3 font-mono text-xs text-gray-500">{s.id}</td>
-                    <td class="px-4 py-3 font-semibold text-gray-900">{s.title}</td>
-                    <td class="px-4 py-3 text-gray-500">{s.category || '-'}</td>
-                    <td class="px-4 py-3 text-gray-500">
-                      {s.participation_type === 'team' ? `${s.team_name} (${s.participants.length}명)` : (s.participants[0]?.name ?? '-')}
-                    </td>
-                    <td class="px-4 py-3 text-gray-500">{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
-                    <td class="px-4 py-3"><StatusBadge status={s.status} /></td>
-                    <td class="px-4 py-3 text-right">
-                      <a href={`/admin/${contest.slug}/${s.id}`} class="font-semibold text-brand-600" style="color:#4f46e5">상세보기</a>
-                    </td>
-                  </tr>
+                  <Fragment>
+                    <tr class={`border-b border-black/5 hover:bg-gray-50 ${s.admin_note ? '' : 'last:border-0'}`}>
+                      <td class="px-4 py-3">
+                        <input type="checkbox" name="ids" value={s.id} class="row-checkbox" />
+                      </td>
+                      <td class="px-4 py-3 font-mono text-xs text-gray-500">{s.id}</td>
+                      <td class="px-4 py-3 font-semibold text-gray-900">{s.title}</td>
+                      <td class="px-4 py-3 text-gray-500">{s.category || '-'}</td>
+                      <td class="px-4 py-3 text-gray-500">
+                        {s.participation_type === 'team' ? `${s.team_name} (${s.participants.length}명)` : (s.participants[0]?.name ?? '-')}
+                      </td>
+                      <td class="px-4 py-3 text-gray-500">{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
+                      <td class="px-4 py-3"><StatusBadge status={s.status} /></td>
+                      <td class="px-4 py-3 text-right">
+                        <a href={`/admin/${contest.slug}/${s.id}`} class="font-semibold text-brand-600" style="color:#4f46e5">상세보기</a>
+                      </td>
+                    </tr>
+                    {
+                      s.admin_note && (
+                        <tr class="border-b border-black/5 last:border-0 bg-amber-50/60">
+                          <td class="px-4 py-2"></td>
+                          <td colspan="7" class="px-4 py-2 text-xs text-amber-800">
+                            <span class="font-semibold">메모:</span> <span class="whitespace-pre-line">{s.admin_note}</span>
+                          </td>
+                        </tr>
+                      )
+                    }
+                  </Fragment>
                 ))
               )
             }
