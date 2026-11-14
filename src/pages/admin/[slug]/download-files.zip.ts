@@ -6,8 +6,10 @@ import { getSubmissionFile } from '../../../lib/storage';
 
 // 학생들이 올린 작품/발표자료 파일을 지금 목록 화면에 보이는 필터(분야/검색/상태 탭)
 // 그대로 적용해서 한 번에 zip으로 묶어 다운로드. 파일 이름이 다 비슷해서 구분이
-// 안 가는 문제를 막으려고, 파일명 앞에 학년반번호+이름(모둠이면 모둠명)과
-// 접수번호를 붙여서 저장함.
+// 안 가는 문제를 막으려고 파일명을 다음 규칙으로 바꿔서 저장함:
+//  - 개인: 학년반번호_이름_작품제목
+//  - 모둠: 모둠이름_대표학생(학년반번호_이름)_작품제목
+// (모둠명만으로는 실제 누구인지 알 수 없어서 대표 학생 정보도 같이 붙임)
 
 function sanitizeSegment(value: string): string {
   return value
@@ -22,19 +24,25 @@ function extensionOf(filename: string): string {
   return idx >= 0 ? filename.slice(idx) : '';
 }
 
+function studentTag(p: { grade?: number | string; classNo?: number | string; number?: number | string; name?: string; raw?: string } | undefined): string {
+  if (!p) return '';
+  if (p.grade) return `${p.grade}학년${p.classNo}반${p.number}번_${p.name || ''}`;
+  return p.name || p.raw || '';
+}
+
 function buildBaseName(s: any): string {
   const first = s.participants[0];
+  const titlePart = sanitizeSegment(s.title || '제출물');
   let who: string;
+
   if (s.participation_type === 'team') {
-    who = sanitizeSegment(s.team_name || '모둠');
-  } else if (first && first.grade) {
-    who = sanitizeSegment(`${first.grade}학년${first.classNo}반${first.number}번_${first.name || ''}`);
-  } else if (first) {
-    who = sanitizeSegment(first.name || first.raw || s.title);
+    const teamName = sanitizeSegment(s.team_name || '모둠');
+    const repTag = sanitizeSegment(studentTag(first) || '대표자없음');
+    who = `${teamName}_${repTag}`;
   } else {
-    who = sanitizeSegment(s.title || '제출물');
+    who = sanitizeSegment(studentTag(first) || s.title || '이름없음');
   }
-  return `${who}_${s.id}`;
+  return `${who}_${titlePart}`;
 }
 
 export const GET: APIRoute = async ({ params, url }) => {
