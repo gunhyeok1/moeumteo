@@ -61,7 +61,11 @@ const currentQs = Astro.url.search;
         <a href="/admin" class="text-sm font-medium text-gray-400 hover:text-gray-600">← 목록으로</a>
         <h1 class="mt-1 text-xl font-extrabold text-gray-900">{contest.name}</h1>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
+        <a href={`/admin/${contest.slug}/export.xlsx`} class="btn-secondary text-sm">엑셀 다운로드 (명단·통과/검토중)</a>
+        <a href={`/admin/${contest.slug}/download-files.zip${Astro.url.search}`} class="btn-secondary text-sm">
+          {viewingDeleted ? '삭제함' : status || '전체'} 작품 파일 전체 다운로드 (zip)
+        </a>
         <a href={`/admin/${contest.slug}/export.csv${Astro.url.search}`} class="btn-secondary text-sm">CSV 내보내기</a>
         <a href={`/c/${contest.slug}`} target="_blank" class="btn-secondary text-sm">공개 페이지 ↗</a>
       </div>
