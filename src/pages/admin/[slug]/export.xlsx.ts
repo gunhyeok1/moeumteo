@@ -25,14 +25,13 @@ const HEADER = [
   '발표자료',
 ];
 
-export const GET: APIRoute = async ({ params, request }) => {
+export const GET: APIRoute = async ({ params }) => {
   const db = env.DB;
   const contest = params.slug ? await getContestBySlug(db, params.slug) : null;
   if (!contest) {
     return new Response('Not found', { status: 404 });
   }
 
-  const origin = new URL(request.url).origin;
   const wb = XLSX.utils.book_new();
 
   for (const status of SHEET_STATUSES) {
@@ -43,8 +42,17 @@ export const GET: APIRoute = async ({ params, request }) => {
       order: 'asc',
     });
 
-    // 주제별로 묶이도록 정렬 (같은 제출의 참가자들은 원래 순서 그대로 붙어있게 유지)
+    // 학년 → 반 → 번호(출석) 순으로 정렬 (같은 번호대면 주제로 한 번 더 묶음)
     const sorted = [...submissions].sort((a, b) => {
+      const gA = a.participants[0]?.grade ?? 0;
+      const gB = b.participants[0]?.grade ?? 0;
+      if (gA !== gB) return gA - gB;
+      const cA = a.participants[0]?.classNo ?? 0;
+      const cB = b.participants[0]?.classNo ?? 0;
+      if (cA !== cB) return cA - cB;
+      const nA = a.participants[0]?.number ?? 0;
+      const nB = b.participants[0]?.number ?? 0;
+      if (nA !== nB) return nA - nB;
       const topicA = a.free_topic_text || a.topic;
       const topicB = b.free_topic_text || b.topic;
       if (topicA !== topicB) return topicA.localeCompare(topicB, 'ko');
@@ -72,8 +80,8 @@ export const GET: APIRoute = async ({ params, request }) => {
           s.title,
           s.ai_tools || '',
           new Date(s.created_at).toLocaleString('ko-KR'),
-          s.work_file_key ? `${origin}/admin/files/${s.work_file_key}` : '',
-          s.slide_file_key ? `${origin}/admin/files/${s.slide_file_key}` : '',
+          s.work_file_name || (s.work_file_key ? '(파일명 없음)' : '-'),
+          s.slide_file_name || (s.slide_file_key ? '(파일명 없음)' : '-'),
         ]);
       }
     }
@@ -82,7 +90,7 @@ export const GET: APIRoute = async ({ params, request }) => {
     sheet['!cols'] = [
       { wch: 5 }, { wch: 10 }, { wch: 6 }, { wch: 6 }, { wch: 9 }, { wch: 10 },
       { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 24 }, { wch: 12 },
-      { wch: 18 }, { wch: 40 }, { wch: 40 },
+      { wch: 18 }, { wch: 24 }, { wch: 24 },
     ];
     XLSX.utils.book_append_sheet(wb, sheet, status);
   }
