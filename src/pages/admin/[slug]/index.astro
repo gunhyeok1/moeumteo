@@ -50,6 +50,12 @@ function qs(overrides: Record<string, string>) {
 const deleted = params.get('deleted') === '1';
 const restored = params.get('restored') === '1';
 const currentQs = Astro.url.search;
+
+// 분야별 zip 다운로드는 대회의 모든 분야를 각각 처리하니까, 지금 선택된
+// 분야 필터는 빼고 상태/검색 조건만 그대로 넘겨줌
+const byCategoryParams = new URLSearchParams(params);
+byCategoryParams.delete('category');
+const byCategoryQs = `?${byCategoryParams.toString()}`;
 ---
 
 <BaseLayout title={`${contest.name} 제출 관리 · 함께 만드는 안전 디지털 세상`}>
@@ -65,6 +71,9 @@ const currentQs = Astro.url.search;
         <a href={`/admin/${contest.slug}/export.xlsx`} class="btn-secondary text-sm">엑셀 다운로드 (명단·통과/검토중)</a>
         <a href={`/admin/${contest.slug}/download-files.zip${Astro.url.search}`} class="btn-secondary text-sm">
           {viewingDeleted ? '삭제함' : status || '전체'} 작품 파일 전체 다운로드 (zip)
+        </a>
+        <a href={`/admin/${contest.slug}/download-files-by-category.zip${byCategoryQs}`} class="btn-secondary text-sm">
+          분야별로 나눠서 zip 다운로드
         </a>
         <a href={`/admin/${contest.slug}/export.csv${Astro.url.search}`} class="btn-secondary text-sm">CSV 내보내기</a>
         <a href={`/c/${contest.slug}`} target="_blank" class="btn-secondary text-sm">공개 페이지 ↗</a>
