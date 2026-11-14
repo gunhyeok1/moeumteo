@@ -3,12 +3,15 @@ import { env } from 'cloudflare:workers';
 import { zipSync } from 'fflate';
 import { getContestBySlug, listSubmissions, DELETED_STATUS } from '../../../lib/db';
 import { getSubmissionFile } from '../../../lib/storage';
-import { buildFriendlyFileName } from '../../../lib/friendly-filename';
+import { buildFriendlyFileName, buildFriendlyBaseName, extensionOf } from '../../../lib/friendly-filename';
 
 // 학생들이 올린 작품/발표자료 파일을 지금 목록 화면에 보이는 필터(분야/검색/상태 탭)
 // 그대로 적용해서 한 번에 zip으로 묶어 다운로드. 파일 이름 규칙은
 // lib/friendly-filename.ts 에 모아두고 개별 다운로드(files/[...key].ts)와
 // 공유함 — 둘 다 똑같이 "학년반번호_이름_작품제목" 형식으로 나오도록.
+// 작품+발표자료를 둘 다 올린 학생은 "2개 올렸구나"가 한눈에 보이도록
+// "학년반번호_이름_작품제목" 폴더 안에 작품/발표자료 두 파일을 같이 넣음.
+// 하나만 올린 학생은 예전처럼 폴더 없이 파일 하나만 그대로 둠.
 
 export const GET: APIRoute = async ({ params, url }) => {
   const db = env.DB;
@@ -43,20 +46,27 @@ export const GET: APIRoute = async ({ params, url }) => {
   }
 
   for (const s of submissions) {
+    const hasBoth = !!(s.work_file_key && s.slide_file_key);
+    const folderName = hasBoth ? reserveName(buildFriendlyBaseName(s)) : null;
+
     if (s.work_file_key) {
       const file = await getSubmissionFile(env, s.work_file_key);
       if (file) {
-        const name = buildFriendlyFileName(s, 'work', file.filename || s.work_file_name || '');
         const bytes = new Uint8Array(await new Response(file.body as any).arrayBuffer());
-        files[reserveName(name)] = bytes;
+        const path = folderName
+          ? `${folderName}/작품${extensionOf(file.filename || s.work_file_name || '')}`
+          : reserveName(buildFriendlyFileName(s, 'work', file.filename || s.work_file_name || ''));
+        files[path] = bytes;
       }
     }
     if (s.slide_file_key) {
       const file = await getSubmissionFile(env, s.slide_file_key);
       if (file) {
-        const name = buildFriendlyFileName(s, 'slide', file.filename || s.slide_file_name || '');
         const bytes = new Uint8Array(await new Response(file.body as any).arrayBuffer());
-        files[reserveName(name)] = bytes;
+        const path = folderName
+          ? `${folderName}/발표자료${extensionOf(file.filename || s.slide_file_name || '')}`
+          : reserveName(buildFriendlyFileName(s, 'slide', file.filename || s.slide_file_name || ''));
+        files[path] = bytes;
       }
     }
   }
