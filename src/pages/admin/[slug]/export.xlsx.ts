@@ -4,7 +4,9 @@ import * as XLSX from 'xlsx';
 import { getContestBySlug, listSubmissions } from '../../../lib/db';
 
 // 선생님께 드릴 "참가 학생 명단 + 주제" 엑셀. 통과/검토중 시트로 나누고,
-// 모둠인 경우 학생 한 명당 한 행씩 풀어서 보여줘서 명단 체크하기 쉽게 만듦.
+// 제출물 1건당 1행으로 보여줌 (모둠이어도 한 줄에 다 모아서 표시 —
+// 예전엔 학생 수만큼 줄을 나눠서 제출 건수랑 엑셀 줄 수가 안 맞고
+// 헷갈린다는 피드백이 있었음).
 const SHEET_STATUSES = ['통과', '검토중'] as const;
 
 const HEADER = [
@@ -65,30 +67,34 @@ export const GET: APIRoute = async ({ params }) => {
       const topicLabel = s.free_topic_text || s.topic || '-';
       const participants = s.participants.length > 0 ? s.participants : [{ raw: '-', grade: '', classNo: '', number: '', name: s.team_name || '-' }];
 
-      for (const p of participants) {
-        rows.push([
-          rowNo++,
-          s.id,
-          p.grade ?? '',
-          p.classNo ?? '',
-          p.number ?? '',
-          p.name || p.raw || '-',
-          s.participation_type === 'team' ? '모둠' : '개인',
-          s.team_name || '',
-          s.category || '-',
-          topicLabel,
-          s.title,
-          s.ai_tools || '',
-          new Date(s.created_at).toLocaleString('ko-KR'),
-          s.work_file_name || (s.work_file_key ? '(파일명 없음)' : '-'),
-          s.slide_file_name || (s.slide_file_key ? '(파일명 없음)' : '-'),
-        ]);
-      }
+      // 모둠이어도 한 줄로 모아서 보여줌 (학년/반/번호/이름을 각각 쉼표로 구분)
+      const grades = participants.map((p) => p.grade ?? '').join(',');
+      const classNos = participants.map((p) => p.classNo ?? '').join(',');
+      const numbers = participants.map((p) => p.number ?? '').join(',');
+      const names = participants.map((p) => p.name || p.raw || '-').join(',');
+
+      rows.push([
+        rowNo++,
+        s.id,
+        grades,
+        classNos,
+        numbers,
+        names,
+        s.participation_type === 'team' ? '모둠' : '개인',
+        s.team_name || '',
+        s.category || '-',
+        topicLabel,
+        s.title,
+        s.ai_tools || '',
+        new Date(s.created_at).toLocaleString('ko-KR'),
+        s.work_file_name || (s.work_file_key ? '(파일명 없음)' : '-'),
+        s.slide_file_name || (s.slide_file_key ? '(파일명 없음)' : '-'),
+      ]);
     }
 
     const sheet = XLSX.utils.aoa_to_sheet([HEADER, ...rows]);
     sheet['!cols'] = [
-      { wch: 5 }, { wch: 10 }, { wch: 6 }, { wch: 6 }, { wch: 9 }, { wch: 10 },
+      { wch: 5 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 20 },
       { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 24 }, { wch: 12 },
       { wch: 18 }, { wch: 24 }, { wch: 24 },
     ];
