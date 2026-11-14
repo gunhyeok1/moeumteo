@@ -7,7 +7,7 @@ import { getContestBySlug, listSubmissions } from '../../../lib/db';
 // 제출물 1건당 1행으로 보여줌 (모둠이어도 한 줄에 다 모아서 표시 —
 // 예전엔 학생 수만큼 줄을 나눠서 제출 건수랑 엑셀 줄 수가 안 맞고
 // 헷갈린다는 피드백이 있었음).
-const SHEET_STATUSES = ['통과', '검토중'] as const;
+const SHEET_STATUSES = ['통과', '검토중', '보류'] as const;
 
 const HEADER = [
   '번호',
