@@ -41,6 +41,7 @@ export const GET: APIRoute = async ({ params, url }) => {
       status,
       excludeStatus: status ? undefined : DELETED_STATUS,
       category,
+      date: sp.get('date') || undefined,
       sort: (sp.get('sort') as any) || 'created_at',
       order: (sp.get('order') as any) || 'desc',
     });
@@ -58,7 +59,8 @@ export const GET: APIRoute = async ({ params, url }) => {
   }
 
   const zipped = zipSync(outer, { level: 0 });
-  const label = status ? `-${status}` : '';
+  const date = sp.get('date');
+  const label = (status ? `-${status}` : '') + (date ? `-${date}` : '');
 
   return new Response(zipped, {
     headers: {

@@ -17,6 +17,7 @@ const params = Astro.url.searchParams;
 const search = params.get('q') ?? '';
 const status = params.get('status') ?? '';
 const category = params.get('category') ?? '';
+const date = params.get('date') ?? '';
 const sort = (params.get('sort') as 'created_at' | 'title' | 'status') ?? 'created_at';
 const order = (params.get('order') as 'asc' | 'desc') ?? 'desc';
 
@@ -26,6 +27,7 @@ const submissions = await listSubmissions(db, {
   status: status || undefined,
   excludeStatus: status ? undefined : DELETED_STATUS,
   category: category || undefined,
+  date: date || undefined,
   sort,
   order,
 });
@@ -70,7 +72,7 @@ const byCategoryQs = `?${byCategoryParams.toString()}`;
       <div class="flex flex-wrap gap-2">
         <a href={`/admin/${contest.slug}/export.xlsx`} class="btn-secondary text-sm">엑셀 다운로드 (명단·통과/검토중)</a>
         <a href={`/admin/${contest.slug}/download-files.zip${Astro.url.search}`} class="btn-secondary text-sm">
-          {viewingDeleted ? '삭제함' : status || '전체'} 작품 파일 전체 다운로드 (zip)
+          {viewingDeleted ? '삭제함' : status || '전체'}{date ? ` (${date})` : ''} 작품 파일 전체 다운로드 (zip)
         </a>
         <a href={`/admin/${contest.slug}/download-files-by-category.zip${byCategoryQs}`} class="btn-secondary text-sm">
           분야별로 나눠서 zip 다운로드
@@ -112,6 +114,10 @@ const byCategoryQs = `?${byCategoryParams.toString()}`;
             <option value={c} selected={category === c}>{c}</option>
           ))}
         </select>
+      </div>
+      <div>
+        <label class="field-label" for="date">제출일</label>
+        <input type="date" id="date" name="date" class="input-field" value={date} />
       </div>
       <div>
         <label class="field-label" for="sort">정렬</label>

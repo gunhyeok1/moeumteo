@@ -266,6 +266,7 @@ export interface SubmissionFilters {
   status?: string;
   excludeStatus?: string;
   category?: string;
+  date?: string; // 'YYYY-MM-DD' — 제출일(한국시간 기준 날짜)로 거르기
   sort?: 'created_at' | 'title' | 'status';
   order?: 'asc' | 'desc';
 }
@@ -284,6 +285,12 @@ export async function listSubmissions(db: D1Database, filters: SubmissionFilters
   if (filters.category) {
     conditions.push('category = ?');
     params.push(filters.category);
+  }
+  if (filters.date) {
+    // created_at은 UTC로 저장되어 있어서, 한국시간(+9시간) 기준 날짜로 비교함
+    // (학생들이 보는 "제출일"도 한국시간 기준이라 이 날짜와 일치해야 함)
+    conditions.push(`date(datetime(created_at, '+9 hours')) = ?`);
+    params.push(filters.date);
   }
   if (filters.search) {
     conditions.push('(title LIKE ? OR team_name LIKE ? OR participants LIKE ? OR id LIKE ?)');
